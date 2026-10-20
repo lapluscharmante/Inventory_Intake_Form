@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jewelry Inventory</title>
+<style>
+  :root {
+    --bg: #faf9f7;
+    --surface: #ffffff;
+    --border: #e5e2db;
+    --border-strong: #c9c5bc;
+    --text: #1a1917;
+    --text-muted: #6b6760;
+    --text-subtle: #9c9890;
+    --accent: #2a6e4e;
+    --accent-bg: #eaf3ee;
+    --accent-border: #b0d4bf;
+    --warn: #7a4f10;
+    --warn-bg: #fdf3e3;
+    --warn-border: #e8c98a;
+    --info: #1a4a7a;
+    --info-bg: #e8f0fa;
+    --info-border: #9dbde0;
+    --danger: #8b1a1a;
+    --danger-bg: #fdeaea;
+    --danger-border: #e0a0a0;
+    --radius: 8px;
+    --radius-lg: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Georgia', serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 1.25rem 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  header h1 { font-size: 20px; font-weight: normal; letter-spacing: 0.04em; color: var(--text); }
+  header span { font-size: 13px; color: var(--text-muted); font-family: 'Courier New', monospace; }
+
+  main { max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+  section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.5rem; margin-bottom: 1.5rem; }
+  section h2 { font-size: 13px; font-weight: normal; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 1.25rem; }
+
+  .row { display: grid; gap: 12px; margin-bottom: 12px; }
+  .col-2 { grid-template-columns: 1fr 1fr; }
+  .col-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .col-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+
+  label { font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 4px; letter-spacing: 0.02em; }
+  label span { color: var(--danger); }
+
+  input, select, textarea {
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 14px;
+    font-family: inherit;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg);
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+  textarea { resize: vertical; line-height: 1.5; }
+
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  button {
+    padding: 8px 16px;
+    font-size: 13px;
+    font-family: inherit;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.12s, border-color 0.12s;
+  }
+  button:hover { background: var(--bg); }
+  button.primary { background: var(--accent-bg); border-color: var(--accent-border); color: var(--accent); }
+  button.primary:hover { background: #d6ebdf; }
+  button.shopify { background: var(--accent-bg); border-color: var(--accent-border); color: var(--accent); }
+  button.etsy { background: var(--warn-bg); border-color: var(--warn-border); color: var(--warn); }
+  button.ebay { background: var(--info-bg); border-color: var(--info-border); color: var(--info); }
+  button.danger { color: var(--danger); border-color: var(--danger-border); background: var(--danger-bg); }
+  button.danger:hover { background: #f9d8d8; }
+  button.sm { padding: 5px 10px; font-size: 12px; }
+
+  .error-msg { display: none; font-size: 13px; color: var(--danger); background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius: var(--radius); padding: 8px 12px; margin-bottom: 12px; }
+
+  .drop-zone {
+    border: 2px dashed var(--border-strong);
+    border-radius: var(--radius-lg);
+    padding: 2rem 1rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    background: var(--bg);
+  }
+  .drop-zone:hover, .drop-zone.drag-over { border-color: var(--accent); background: var(--accent-bg); }
+  .drop-zone p { font-size: 13px; color: var(--text-muted); margin: 0; }
+  .drop-zone p.label { font-size: 14px; color: var(--text); margin-bottom: 4px; }
+
+  .invoice-preview { display: none; margin-top: 1rem; }
+  .invoice-preview img { max-width: 100%; max-height: 280px; border-radius: var(--radius); border: 1px solid var(--border); object-fit: contain; }
+
+  .parse-status { font-size: 13px; color: var(--text-muted); margin-top: 8px; display: none; }
+  .parse-status.active { display: block; }
+  .parse-status.success { color: var(--accent); }
+  .parse-status.error { color: var(--danger); }
+
+  .item-thumb { width: 44px; height: 44px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border); flex-shrink: 0; }
+
+  .photo-upload-area { display: flex; align-items: center; gap: 12px; }
+  .photo-preview-wrap { position: relative; display: inline-block; }
+  .photo-preview-wrap img { width: 80px; height: 80px; object-fit: cover; border-radius: var(--radius); border: 1px solid var(--border); display: block; }
+  .photo-preview-wrap button { position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; border-radius: 50%; padding: 0; font-size: 11px; line-height: 1; display: flex; align-items: center; justify-content: center; }
+
+  #queue-section { display: none; }
+  .queue-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 8px; }
+  .queue-header h2 { margin-bottom: 0; }
+  .export-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  .item-row {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 6px;
+    background: var(--bg);
+  }
+  .item-info { flex: 1; min-width: 0; }
+  .item-title { font-size: 14px; font-weight: normal; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
+  .item-meta { font-size: 12px; color: var(--text-muted); font-family: 'Courier New', monospace; }
+  .item-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+  .photo-guide { display: none; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.25rem; margin-top: 1rem; }
+  .photo-guide h3 { font-size: 13px; font-weight: normal; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 1rem; }
+  .photo-item { margin-bottom: 1rem; }
+  .photo-item-title { font-size: 13px; color: var(--text); margin-bottom: 6px; }
+  .photo-shot { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+  .photo-shot code { font-family: 'Courier New', monospace; font-size: 11px; background: var(--surface); border: 1px solid var(--border); padding: 2px 7px; border-radius: 4px; color: var(--text); white-space: nowrap; }
+
+  @media (max-width: 600px) {
+    .col-2, .col-3, .col-4 { grid-template-columns: 1fr; }
+    main { padding: 1rem; }
+    header { padding: 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Jewelry Inventory</h1>
+  <span>intake tool</span>
+  <div style="margin-left: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+    <label style="margin:0; display:inline-flex; align-items:center; gap:6px;" title="Goes at the start of auto-generated SKUs so they never clash with teammates' SKUs">
+      Your initials
+      <input id="f-initials" type="text" maxlength="4" placeholder="AB" oninput="saveInitials()" style="width:56px; padding:4px 6px; font-size:12px; text-transform:uppercase;" />
+    </label>
+    <span id="autosave-status" style="font-size:11px; color:var(--text-subtle); font-family:'Courier New',monospace;"></span>
+    <button class="sm" onclick="saveSession()" style="font-size:12px;">↓ Export session</button>
+    <label style="margin:0; cursor:pointer;">
+      <span style="font-size:12px; padding:5px 10px; border:1px solid var(--border-strong); border-radius:var(--radius); background:var(--surface); color:var(--text); display:inline-block; cursor:pointer;">↑ Load session</span>
+      <input type="file" id="load-file" accept=".json" onchange="loadSession(event)" style="display:none;" />
+    </label>
+    <button class="sm danger" onclick="clearAutosave()" style="font-size:12px;" title="Clear autosaved data">✕ Clear</button>
+    <span id="session-msg" style="font-size:12px; color:var(--accent); display:none;"></span>
+  </div>
+</header>
+
+<main>
+
+<section>
+  <h2>Invoice scan <span style="font-size:11px; font-weight:normal; letter-spacing:0; text-transform:none; color:var(--text-subtle);">optional — auto-fills the form below</span></h2>
+  <div class="drop-zone" id="invoice-drop" onclick="document.getElementById('invoice-file').click()" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleInvoiceDrop(event)">
+    <p class="label">📄 Drop invoice photo here or tap to choose</p>
+    <p>Accepts HEIC, JPG, JPEG, PNG</p>
+  </div>
+  <input type="file" id="invoice-file" accept=".heic,.heif,.jpg,.jpeg,.png,image/heic,image/heif,image/jpeg,image/png" style="display:none;" onchange="handleInvoiceFile(event)" />
+  <div class="invoice-preview" id="invoice-preview">
+    <img id="invoice-img" src="" alt="Invoice preview" />
+    <div style="margin-top:8px; display:flex; gap:8px; align-items:center;">
+      <button class="sm primary" onclick="parseInvoice()">↺ Re-scan invoice</button>
+      <button class="sm danger" onclick="clearInvoice()">✕ Remove</button>
+    </div>
+  </div>
+  <div class="parse-status" id="parse-status"></div>
+</section>
+
+<section>
+  <h2>Item details</h2>
+
+  <div style="margin-bottom:14px;">
+    <label>Item photo <span style="font-size:11px; color:var(--text-subtle); font-weight:normal;">(for your reference — HEIC, JPG, JPEG, PNG)</span></label>
+    <div class="photo-upload-area">
+      <div id="item-photo-preview-wrap" style="display:none;" class="photo-preview-wrap">
+        <img id="item-photo-preview" src="" alt="Item photo" />
+        <button class="danger" onclick="clearItemPhoto()" title="Remove photo">✕</button>
+      </div>
+      <label style="margin:0; cursor:pointer;">
+        <span style="font-size:13px; padding:7px 14px; border:1px solid var(--border-strong); border-radius:var(--radius); background:var(--bg); color:var(--text-muted); display:inline-block; cursor:pointer;">📷 Choose photo</span>
+        <input type="file" id="item-photo-file" accept=".heic,.heif,.jpg,.jpeg,.png,image/heic,image/heif,image/jpeg,image/png" style="display:none;" onchange="handleItemPhoto(event)" />
+      </label>
+      <span id="item-photo-name" style="font-size:12px; color:var(--text-subtle);"></span>
+    </div>
+  </div>
+
+  <div class="row col-2">
+    <div><label>Title <span>*</span></label><input id="f-title" type="text" placeholder="e.g. 14k Gold Solitaire Ring" /></div>
+    <div><label>SKU / Item ID</label><input id="f-sku" type="text" placeholder="auto-generated from your initials if blank" /></div>
+  </div>
+
+  <div class="row col-3">
+    <div>
+      <label>Metal type</label>
+      <select id="f-metal">
+        <option value="">— select —</option>
+        <option>14k Yellow Gold</option><option>14k White Gold</option><option>14k Rose Gold</option>
+        <option>18k Yellow Gold</option><option>18k White Gold</option>
+        <option>Sterling Silver</option><option>Platinum</option>
+        <option>Gold Filled</option><option>Gold Plated</option><option>Other</option>
+      </select>
+    </div>
+    <div>
+      <label>Category</label>
+      <select id="f-category">
+        <option value="">— select —</option>
+        <option>Ring</option><option>Necklace</option><option>Bracelet</option>
+        <option>Earrings</option><option>Pendant</option><option>Brooch</option>
+        <option>Anklet</option><option>Other</option>
+      </select>
+    </div>
+    <div>
+      <label>Condition</label>
+      <select id="f-condition">
+        <option value="">— select —</option>
+        <option>New</option><option>Excellent</option><option>Very Good</option>
+        <option>Good</option><option>Fair</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="row col-4">
+    <div><label>Weight (g)</label><input id="f-weight" type="number" step="0.01" placeholder="0.00" /></div>
+    <div>
+      <label>Length (mm)
+        <span style="margin-left:6px; font-size:11px;">
+          <label style="display:inline;margin:0;cursor:pointer;"><input type="radio" name="dim-unit" value="mm" checked onchange="updateDimLabels()" style="width:auto;margin-right:2px;">mm</label>
+          &nbsp;
+          <label style="display:inline;margin:0;cursor:pointer;"><input type="radio" name="dim-unit" value="in" onchange="updateDimLabels()" style="width:auto;margin-right:2px;">in</label>
+        </span>
+      </label>
+      <input id="f-length" type="number" step="0.01" placeholder="0.0" />
+    </div>
+    <div><label id="width-label">Width (mm)</label><input id="f-width" type="number" step="0.01" placeholder="0.0" /></div>
+    <div><label>Ring size</label><input id="f-size" type="text" placeholder="e.g. 7" /></div>
+  </div>
+
+  <div class="row col-2">
+    <div><label>Stone type</label><input id="f-stone" type="text" placeholder="e.g. Diamond, Ruby, None" /></div>
+    <div><label>Stone details</label><input id="f-stone-detail" type="text" placeholder="e.g. 0.5ct, SI1, G color" /></div>
+  </div>
+
+  <div class="row col-3">
+    <div><label>Cost / purchase price ($)</label><input id="f-cost" type="number" step="0.01" placeholder="0.00" /></div>
+    <div><label>Sale price ($)</label><input id="f-price" type="number" step="0.01" placeholder="0.00" /></div>
+    <div><label>Quantity</label><input id="f-qty" type="number" step="1" min="1" placeholder="1" /></div>
+  </div>
+
+  <div class="row col-2">
+    <div><label>Vendor name</label><input id="f-vendor" type="text" placeholder="e.g. Supplier Co." /></div>
+    <div><label>Date of purchase</label><input id="f-purchase-date" type="date" /></div>
+  </div>
+
+  <div style="margin-bottom: 16px;">
+    <label>Additional notes <span style="font-size:11px; color:var(--text-subtle); font-weight:normal;">(optional — added to AI-generated description)</span></label>
+    <textarea id="f-desc" rows="2" placeholder="Any extra details to include in the listing description..."></textarea>
+  </div>
+
+  <div id="generated-desc-wrap" style="display:none; margin-bottom:16px;">
+    <label style="display:flex; align-items:center; justify-content:space-between;">
+      <span>Generated description</span>
+      <button class="sm" onclick="regenerateDesc()" style="font-size:11px; padding:3px 8px;">↺ Regenerate</button>
+    </label>
+    <textarea id="f-generated-desc" rows="4" style="font-size:13px; line-height:1.6;"></textarea>
+  </div>
+
+  <div id="error-msg" class="error-msg"></div>
+
+  <div class="btn-row" style="align-items:center;">
+    <button class="primary" id="add-btn" onclick="handleAddClick()">+ Add to queue</button>
+    <button onclick="clearForm()">↺ Clear form</button>
+    <label style="display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--text-muted); margin:0; cursor:pointer; font-weight:normal;">
+      <input type="checkbox" id="print-on-add" style="width:auto; margin:0;" />
+      Print label after adding
+    </label>
+    <span id="gen-status" style="font-size:12px; color:var(--text-subtle); display:none;">Generating description…</span>
+  </div>
+</section>
+
+<section id="queue-section">
+  <div class="queue-header">
+    <h2>Queue <span id="item-count" style="font-size:12px; color: var(--text-subtle); text-transform: none; letter-spacing: 0;"></span></h2>
+    <div class="export-btns">
+      <button class="sm shopify" onclick="exportCSV('shopify')">↓ Shopify CSV</button>
+      <button class="sm etsy" onclick="exportCSV('etsy')">↓ Etsy CSV</button>
+      <button class="sm ebay" onclick="exportCSV('ebay')">↓ eBay CSV</button>
+      <button class="sm" onclick="printAllTags()">⬡ Print all tags</button>
+      <button class="sm" onclick="togglePhotoGuide()">⌾ Photo names</button>
+    </div>
+  </div>
+
+  <div id="inventory-list"></div>
+
+  <div id="photo-guide" class="photo-guide">
+    <h3>Photo naming guide</h3>
+    <p style="font-size:13px; color:var(--text-muted); margin-bottom:1rem;">Name your files exactly as shown. Upload in order — the first file becomes the main listing image.</p>
+    <div id="photo-list"></div>
+  </div>
+</section>
+
+</main>
+
+<script>
+var inventory = [];
+var AUTOSAVE_KEY = 'jewelry_inventory_autosave';
+
+function autosave() {
+  try {
+    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({ version: 1, savedAt: new Date().toISOString(), inventory: inventory }));
+    var el = document.getElementById('autosave-status');
+    if (el) {
+      var now = new Date();
+      var h = now.getHours(), m = now.getMinutes();
+      el.textContent = 'autosaved ' + (h % 12 || 12) + ':' + (m < 10 ? '0'+m : m) + (h < 12 ? ' am' : ' pm');
+    }
+  } catch(e) {}
+}
+
+function autoRestore() {
+  try {
+    var raw = localStorage.getItem(AUTOSAVE_KEY);
+    if (!raw) return;
+    var data = JSON.parse(raw);
+    if (data.inventory && data.inventory.length) {
+      inventory = data.inventory;
+      renderQueue();
+      var el = document.getElementById('autosave-status');
+      if (el) {
+        var d = new Date(data.savedAt);
+        el.textContent = 'restored ' + d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
+      }
+    }
+  } catch(e) {}
+}
+
+window.addEventListener('load', autoRestore);
+
+// ── SKUs ──────────────────────────────────────────────────────────────────────
+// Each person works in their own browser, so auto-generated SKUs start with
+// their initials (AF-RI-001) to stay unique across the team. The per-prefix
+// counter is remembered separately from the queue, so removing or exporting
+// items never makes a number get handed out twice.
+var INITIALS_KEY = 'jewelry_inventory_initials';
+var SKU_COUNTERS_KEY = 'jewelry_inventory_sku_counters';
+
+function getInitials() {
+  return v('f-initials').toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+function saveInitials() {
+  try { localStorage.setItem(INITIALS_KEY, getInitials()); } catch(e) {}
+}
+
+window.addEventListener('load', function() {
+  try { document.getElementById('f-initials').value = localStorage.getItem(INITIALS_KEY) || ''; } catch(e) {}
+});
+
+var SHOTS = [
+  {slot:'01', label:'Main — full item, white background'},
+  {slot:'02', label:'Front close-up'},
+  {slot:'03', label:'Side profile'},
+  {slot:'04', label:'Back / clasp / hallmark'},
+  {slot:'05', label:'Detail — stone or engraving'},
+  {slot:'06', label:'Scale reference (ruler or coin)'},
+  {slot:'07', label:'On model / lifestyle'}
+];
+
+function v(id) { return (document.getElementById(id)||{value:''}).value.trim(); }
+
+function updateDimLabels() {
+  var unit = document.querySelector('input[name="dim-unit"]:checked').value;
+  document.getElementById('width-label').textContent = 'Width (' + unit + ')';
+  var lengthLabel = document.querySelector('label[for="f-length"]') || document.querySelector('#f-length').previousElementSibling;
+  // update only the text node of the length label (preserving the radio span)
+  var lengthLabelEl = document.querySelector('.row.col-4 div:nth-child(2) > label');
+  if (lengthLabelEl) {
+    var firstText = lengthLabelEl.firstChild;
+    if (firstText && firstText.nodeType === 3) firstText.textContent = 'Length (' + unit + ') ';
+  }
+}
+
+function showError(msg) {
+  var el = document.getElementById('error-msg');
+  el.textContent = msg;
+  el.style.display = msg ? 'block' : 'none';
+}
+
+function autoSKU(category) {
+  var prefix = getInitials() + '-' + (category ? category.substring(0,2).toUpperCase() : 'IT');
+  var counters = {};
+  try { counters = JSON.parse(localStorage.getItem(SKU_COUNTERS_KEY)) || {}; } catch(e) {}
+  var n = counters[prefix] || 0;
+  var pattern = new RegExp('^' + prefix + '-(\\d+)$');
+  inventory.forEach(function(item) {
+    var m = String(item.sku).match(pattern);
+    if (m) n = Math.max(n, parseInt(m[1], 10));
+  });
+  n++;
+  counters[prefix] = n;
+  try { localStorage.setItem(SKU_COUNTERS_KEY, JSON.stringify(counters)); } catch(e) {}
+  return prefix + '-' + String(n).padStart(3,'0');
+}
+
+function gatherFormData() {
+  return {
+    title: v('f-title'),
+    sku: v('f-sku'),
+    metal: v('f-metal'),
+    category: v('f-category'),
+    condition: v('f-condition'),
+    weight: v('f-weight'),
+    length: v('f-length'),
+    width: v('f-width'),
+    dimUnit: document.querySelector('input[name="dim-unit"]:checked').value,
+    size: v('f-size'),
+    stone: v('f-stone'),
+    stoneDetail: v('f-stone-detail'),
+    cost: v('f-cost'),
+    price: v('f-price'),
+    qty: v('f-qty') || '1',
+    vendor: v('f-vendor'),
+    purchaseDate: v('f-purchase-date'),
+    desc: v('f-desc'),
+    photoDataUrl: window._itemPhotoDataUrl || null
+  };
+}
+
+// Calls one of the server routes in functions/api/, which hold the Anthropic
+// API key. Throws with the server's explanation when something goes wrong.
+async function callApi(path, payload) {
+  var response = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  var result = null;
+  try { result = await response.json(); } catch(e) {}
+  if (!response.ok || !result) throw new Error((result && result.error) || 'Server error (' + response.status + ')');
+  return result;
+}
+
+async function generateDescription(data) {
+  var payload = Object.assign({}, data);
+  delete payload.photoDataUrl;
+  var result = await callApi('/api/describe', payload);
+  return result.description;
+}
+
+function showGenFallback(err) {
+  var genStatus = document.getElementById('gen-status');
+  genStatus.textContent = 'AI description unavailable (' + err.message + ') — used a basic description instead.';
+  genStatus.style.display = 'inline';
+}
+
+var pendingFormData = null;
+
+async function handleAddClick() {
+  var title = v('f-title');
+  if (!title) { showError('Item title is required.'); return; }
+  if (!v('f-sku') && !getInitials()) { showError('Enter your initials at the top of the page — they start each auto-generated SKU so yours never clash with teammates\'.'); return; }
+  showError('');
+
+  var generatedWrap = document.getElementById('generated-desc-wrap');
+  var generatedField = document.getElementById('f-generated-desc');
+  var genStatus = document.getElementById('gen-status');
+  var addBtn = document.getElementById('add-btn');
+
+  // If we already have a generated description showing, add the item
+  if (generatedWrap.style.display !== 'none' && generatedField.value) {
+    addToInventory(generatedField.value);
+    return;
+  }
+
+  // Otherwise generate first
+  pendingFormData = gatherFormData();
+  addBtn.disabled = true;
+  addBtn.textContent = 'Generating…';
+  genStatus.textContent = 'Generating description…';
+  genStatus.style.display = 'inline';
+
+  try {
+    var desc = await generateDescription(pendingFormData);
+    generatedField.value = desc;
+    generatedWrap.style.display = 'block';
+    addBtn.disabled = false;
+    addBtn.textContent = '✓ Confirm & add to queue';
+    genStatus.style.display = 'none';
+  } catch(e) {
+    // Fallback: use buildDesc if API unavailable
+    generatedField.value = buildDesc(pendingFormData);
+    generatedWrap.style.display = 'block';
+    addBtn.disabled = false;
+    addBtn.textContent = '✓ Confirm & add to queue';
+    showGenFallback(e);
+  }
+}
+
+async function regenerateDesc() {
+  var data = pendingFormData || gatherFormData();
+  var generatedField = document.getElementById('f-generated-desc');
+  var genStatus = document.getElementById('gen-status');
+  genStatus.textContent = 'Generating description…';
+  genStatus.style.display = 'inline';
+  try {
+    generatedField.value = await generateDescription(data);
+    genStatus.style.display = 'none';
+  } catch(e) {
+    generatedField.value = buildDesc(data);
+    showGenFallback(e);
+  }
+}
+
+function addToInventory(generatedDesc) {
+  var data = pendingFormData || gatherFormData();
+  var item = {
+    id: Date.now(),
+    title: data.title,
+    sku: data.sku || autoSKU(data.category),
+    metal: data.metal,
+    category: data.category,
+    condition: data.condition,
+    weight: data.weight,
+    length: data.length,
+    width: data.width,
+    dimUnit: data.dimUnit,
+    size: data.size,
+    stone: data.stone,
+    stoneDetail: data.stoneDetail,
+    cost: data.cost,
+    price: data.price,
+    qty: data.qty || '1',
+    vendor: data.vendor,
+    purchaseDate: data.purchaseDate,
+    desc: generatedDesc || buildDesc(data),
+    photoDataUrl: data.photoDataUrl || null,
+    date: new Date().toLocaleDateString()
+  };
+  inventory.push(item);
+  renderQueue();
+  autosave();
+  var shouldPrint = document.getElementById('print-on-add').checked;
+  clearForm();
+  if (shouldPrint) printTag(item.id);
+}
+
+function removeItem(id) {
+  inventory = inventory.filter(function(i){ return i.id !== id; });
+  renderQueue();
+  autosave();
+}
+
+function renderQueue() {
+  var section = document.getElementById('queue-section');
+  var list = document.getElementById('inventory-list');
+  var count = document.getElementById('item-count');
+  if (inventory.length === 0) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+  count.textContent = '(' + inventory.length + ' item' + (inventory.length !== 1 ? 's' : '') + ')';
+  list.innerHTML = inventory.map(function(item) {
+    var meta = [item.sku, item.metal, item.category, item.weight ? item.weight+'g' : '', item.price ? '$'+item.price : '', 'qty '+item.qty, item.vendor, item.purchaseDate].filter(Boolean).join(' · ');
+    var thumb = item.photoDataUrl ? '<img class="item-thumb" src="' + item.photoDataUrl + '" alt="Item photo" />' : '';
+    return '<div class="item-row">'
+      + thumb
+      + '<div class="item-info">'
+      + '<div class="item-title">' + escapeHtml(item.title) + '</div>'
+      + '<div class="item-meta">' + escapeHtml(meta) + '</div>'
+      + '</div>'
+      + '<div class="item-actions">'
+      + '<button class="sm" onclick="printTag('+item.id+')">⬡ Tag</button>'
+      + '<button class="sm danger" onclick="removeItem('+item.id+')">✕</button>'
+      + '</div>'
+      + '</div>';
+  }).join('');
+  refreshPhotoGuide();
+}
+
+function clearForm() {
+  ['f-title','f-sku','f-metal','f-category','f-condition','f-weight','f-length','f-width','f-size','f-stone','f-stone-detail','f-cost','f-price','f-qty','f-vendor','f-purchase-date','f-desc'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  var generatedWrap = document.getElementById('generated-desc-wrap');
+  if (generatedWrap) generatedWrap.style.display = 'none';
+  var generatedField = document.getElementById('f-generated-desc');
+  if (generatedField) generatedField.value = '';
+  var addBtn = document.getElementById('add-btn');
+  if (addBtn) { addBtn.disabled = false; addBtn.textContent = '+ Add to queue'; }
+  var genStatus = document.getElementById('gen-status');
+  if (genStatus) genStatus.style.display = 'none';
+  pendingFormData = null;
+  clearItemPhoto();
+  showError('');
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function buildDesc(item) {
+  var parts = [];
+  if (item.metal) parts.push(item.metal);
+  if (item.category) parts.push(item.category.toLowerCase());
+  if (item.stone && item.stone.toLowerCase() !== 'none') parts.push('with ' + item.stone + (item.stoneDetail ? ' (' + item.stoneDetail + ')' : ''));
+  if (item.size) parts.push('Size: ' + item.size);
+  if (item.weight) parts.push('Weight: ' + item.weight + 'g');
+  if (item.length || item.width) parts.push('Dimensions: ' + [item.length ? item.length+(item.dimUnit||'mm')+' L':'', item.width ? item.width+(item.dimUnit||'mm')+' W':''].filter(Boolean).join(' x '));
+  if (item.condition) parts.push('Condition: ' + item.condition);
+  if (item.desc) parts.push(item.desc);
+  return parts.join('. ');
+}
+
+function escapeCSV(val) {
+  if (val === null || val === undefined) return '';
+  var s = String(val);
+  if (s.indexOf(',') >= 0 || s.indexOf('"') >= 0 || s.indexOf('\n') >= 0) return '"' + s.replace(/"/g,'""') + '"';
+  return s;
+}
+
+function downloadCSV(filename, rows) {
+  var csv = rows.map(function(r){ return r.map(escapeCSV).join(','); }).join('\n');
+  var blob = new Blob([csv], {type:'text/csv'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportCSV(platform) {
+  var date = new Date().toISOString().slice(0,10);
+  if (platform === 'shopify') {
+    var headers = ['Title','URL handle','Description','Product category','Type','Tags','Published on online store','Status','SKU','Price','Compare-at price','Cost per item','Weight value (grams)','Weight unit for display','Inventory quantity','SEO title','SEO description'];
+    var rows = [headers].concat(inventory.map(function(item) {
+      var handle = item.title.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+      var tags = [item.metal, item.category, item.stone, item.condition].filter(Boolean).join(', ');
+      var desc = item.desc || buildDesc(item);
+      return [item.title, handle, '<p>'+desc+'</p>', 'Jewelry', item.category, tags, 'FALSE', 'Draft', item.sku, item.price||'', '', item.cost||'', item.weight||'', 'g', item.qty||'1', item.title, desc.substring(0,160)];
+    }));
+    downloadCSV('shopify_import_'+date+'.csv', rows);
+  } else if (platform === 'etsy') {
+    var headers = ['TITLE','DESCRIPTION','PRICE','QUANTITY','SKU','TAGS','MATERIALS','SECTION','WHO_MADE','IS_SUPPLY','WHEN_MADE','SHIPPING_PROFILE_NAME','PURCHASE_DATE'];
+    var rows = [headers].concat(inventory.map(function(item) {
+      var tags = [item.metal, item.category, item.stone, item.condition, 'jewelry', 'handmade'].filter(Boolean).join(',');
+      var materials = [item.metal, item.stone].filter(Boolean).join(',');
+      return [item.title, buildDesc(item), item.price||'', item.qty||'1', item.sku, tags, materials, item.category||'', 'i_did', 'false', 'made_to_order', '', item.purchaseDate||''];
+    }));
+    downloadCSV('etsy_import_'+date+'.csv', rows);
+  } else if (platform === 'ebay') {
+    var headers = ['Action','ItemID','Title','Description','PrimaryCategory','StartPrice','Quantity','ConditionID','SKU','Weight','WeightUnit','PaymentMethods','ShippingType','PurchaseDate'];
+    var condMap = {'New':'1000','Excellent':'3000','Very Good':'4000','Good':'5000','Fair':'7000'};
+    var rows = [headers].concat(inventory.map(function(item) {
+      return ['Add','', item.title, buildDesc(item), '281', item.price||'', item.qty||'1', condMap[item.condition]||'3000', item.sku, item.weight||'', 'g', 'PayPal', 'Flat', item.purchaseDate||''];
+    }));
+    downloadCSV('ebay_import_'+date+'.csv', rows);
+  }
+}
+
+// ── Barcode: Code 128 subset C / B inline generator ──────────────────────────
+// Minimal Code 128B encoder — no external lib needed
+var C128_START_B = 104, C128_STOP = 106;
+var C128B = ' !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~';
+var C128_PATTERNS = [
+  '11011001100','11001101100','11001100110','10010011000','10010001100','10001001100',
+  '10011001000','10011000100','10001100100','11001001000','11001000100','11000100100',
+  '10110011100','10011011100','10011001110','10111001100','10011101100','10011100110',
+  '11001110010','11001011100','11001001110','11011100100','11001110100','11101101110',
+  '11101001100','11100101100','11100100110','11101100100','11100110100','11100110010',
+  '11011011000','11011000110','11000110110','10100011000','10001011000','10001000110',
+  '10110001000','10001101000','10001100010','11010001000','11000101000','11000100010',
+  '10110111000','10110001110','10001101110','10111011000','10111000110','10001110110',
+  '11101110110','11010001110','11000101110','11011101000','11011100010','11011101110',
+  '11101011000','11101000110','11100010110','11101101000','11101100010','11100011010',
+  '11101111010','11001000010','11110001010','10100110000','10100001100','10010110000',
+  '10010000110','10000101100','10000100110','10110100000','10110000100','10011010000',
+  '10011000010','10000110100','10000110010','11000010010','11001010000','11110111010',
+  '11000010100','10001111010','10100111100','10010111100','10010011110','10111100100',
+  '10011110100','10011110010','11110100100','11110010100','11110010010','11011011110',
+  '11011110110','11110110110','10101111000','10100011110','10001011110','10111101000',
+  '10111100010','11110101000','11110100010','10111011110','10111101110','11101011110',
+  '11110101110','11010000100','11010010000','11010011100','11000111010'
+];
+
+function encodeCode128(text) {
+  var codes = [C128_START_B];
+  var checksum = C128_START_B;
+  for (var i = 0; i < text.length; i++) {
+    var idx = C128B.indexOf(text[i]);
+    if (idx < 0) idx = 0;
+    codes.push(idx);
+    checksum += (i + 1) * idx;
+  }
+  codes.push(checksum % 103);
+  codes.push(C128_STOP);
+  var bars = '';
+  for (var j = 0; j < codes.length; j++) {
+    bars += C128_PATTERNS[codes[j]];
+  }
+  bars += '11'; // stop terminator
+  return bars;
+}
+
+function renderBarcodeSVG(text, width, height) {
+  var bars = encodeCode128(text);
+  var barWidth = Math.max(1, Math.floor(width / bars.length));
+  var svgWidth = bars.length * barWidth;
+  var rects = '';
+  var x = 0;
+  for (var i = 0; i < bars.length; i++) {
+    if (bars[i] === '1') {
+      rects += '<rect x="' + x + '" y="0" width="' + barWidth + '" height="' + height + '" fill="#000"/>';
+    }
+    x += barWidth;
+  }
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="' + svgWidth + '" height="' + height + '" viewBox="0 0 ' + svgWidth + ' ' + height + '">' + rects + '</svg>';
+}
+
+function buildTagPage(items) {
+  // Label size: 2.36" x 0.47" dumbbell fold (each half ~1.18" x 0.47")
+  // Left half: barcode. Right half: SKU + title + price.
+  // Center dashed line = fold point.
+  var tags = items.map(function(item) {
+    var title = item.title.length > 22 ? item.title.substring(0,22)+'…' : item.title;
+    var meta = [item.metal, item.category].filter(Boolean).join(' · ');
+    meta = meta.length > 24 ? meta.substring(0,24)+'…' : meta;
+    var bc = renderBarcodeSVG(item.sku, 96, 22);
+    return '<div style="'
+      + 'width:2.36in;height:0.47in;'
+      + 'display:inline-flex;flex-direction:row;'
+      + 'border:0.5px solid #bbb;'
+      + 'font-family:Arial,sans-serif;'
+      + 'background:#fff;'
+      + 'vertical-align:top;'
+      + 'margin:4px;'
+      + 'overflow:hidden;'
+      + 'page-break-inside:avoid;'
+      + '">'
+      // Left half — barcode
+      + '<div style="'
+        + 'width:1.18in;'
+        + 'display:flex;flex-direction:column;align-items:center;justify-content:center;'
+        + 'padding:2px 3px;'
+        + 'border-right:1px dashed #aaa;'
+        + 'box-sizing:border-box;'
+        + '">'
+        + bc
+        + '<div style="font-size:6px;color:#555;font-family:Courier New,monospace;margin-top:1px;letter-spacing:0.02em;">' + escapeHtml(item.sku) + '</div>'
+      + '</div>'
+      // Right half — info
+      + '<div style="'
+        + 'width:1.18in;'
+        + 'display:flex;flex-direction:column;justify-content:center;'
+        + 'padding:2px 4px;'
+        + 'box-sizing:border-box;'
+        + '">'
+        + '<div style="font-size:7px;font-weight:bold;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2;">' + escapeHtml(title) + '</div>'
+        + (meta ? '<div style="font-size:6px;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2;margin-top:1px;">' + escapeHtml(meta) + '</div>' : '')
+        + (item.price ? '<div style="font-size:9px;font-weight:bold;color:#111;margin-top:2px;line-height:1;">' + '$' + item.price + '</div>' : '')
+      + '</div>'
+      + '</div>';
+  }).join('');
+
+  return '<!DOCTYPE html><html><head><title>Jewelry Tags</title>'
+    + '<style>'
+    + 'body{margin:0;padding:12px;background:#fff;font-family:Arial,sans-serif;}'
+    + '.info{font-size:11px;color:#666;margin-bottom:10px;}'
+    + '@media print{button,.info{display:none!important;} body{padding:4px;}}'
+    + '</style>'
+    + '</head><body>'
+    + '<button onclick="window.print()" style="margin-bottom:8px;padding:6px 16px;font-size:13px;cursor:pointer;border:1px solid #ccc;border-radius:5px;background:#f5f5f5;">🖨 Print tags</button>'
+    + '<div class="info">Labels sized for 2.36" × 0.47" dumbbell fold adhesive jewelry tags. Fold at center dashed line and press ends together around item.</div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:2px;align-items:flex-start;">'
+    + tags
+    + '</div>'
+    + '</body></html>';
+}
+
+function printTag(id) {
+  var item = inventory.find(function(i){ return i.id === id; });
+  if (!item) return;
+  var w = window.open('','_blank','width=720,height=520');
+  if (w) { w.document.write(buildTagPage([item])); w.document.close(); }
+}
+
+function printAllTags() {
+  if (!inventory.length) return;
+  var w = window.open('','_blank','width=720,height=600');
+  if (w) { w.document.write(buildTagPage(inventory)); w.document.close(); }
+}
+
+function togglePhotoGuide() {
+  var guide = document.getElementById('photo-guide');
+  guide.style.display = guide.style.display === 'none' || guide.style.display === '' ? 'block' : 'none';
+  refreshPhotoGuide();
+}
+
+function refreshPhotoGuide() {
+  var list = document.getElementById('photo-list');
+  if (!list) return;
+  if (!inventory.length) {
+    list.innerHTML = '<p style="font-size:13px;color:var(--text-muted);">Add items to the queue first.</p>';
+    return;
+  }
+  list.innerHTML = inventory.map(function(item) {
+    var shots = SHOTS.map(function(s) {
+      return '<div class="photo-shot"><code>' + escapeHtml(item.sku) + '_' + s.slot + '.jpg</code><span>' + s.label + '</span></div>';
+    }).join('');
+    return '<div class="photo-item"><div class="photo-item-title">' + escapeHtml(item.title) + ' <span style="font-size:11px;color:var(--text-subtle);font-family:Courier New,monospace;">(' + escapeHtml(item.sku) + ')</span></div>' + shots + '</div>';
+  }).join('');
+}
+
+function showSessionMsg(msg, isError) {
+  var el = document.getElementById('session-msg');
+  el.textContent = msg;
+  el.style.color = isError ? 'var(--danger)' : 'var(--accent)';
+  el.style.display = 'inline';
+  setTimeout(function(){ el.style.display = 'none'; }, 3000);
+}
+
+function saveSession() {
+  if (!inventory.length) { showSessionMsg('Queue is empty — nothing to save.', true); return; }
+  var data = JSON.stringify({ version: 1, savedAt: new Date().toISOString(), inventory: inventory }, null, 2);
+  var blob = new Blob([data], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  var date = new Date().toISOString().slice(0,10);
+  a.href = url;
+  a.download = 'jewelry_session_' + date + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showSessionMsg('Session saved (' + inventory.length + ' item' + (inventory.length !== 1 ? 's' : '') + ').');
+}
+
+function clearAutosave() {
+  if (!confirm('Clear all autosaved data and remove items from queue?')) return;
+  try { localStorage.removeItem(AUTOSAVE_KEY); } catch(e) {}
+  inventory = [];
+  renderQueue();
+  var el = document.getElementById('autosave-status');
+  if (el) el.textContent = '';
+  showSessionMsg('Autosave cleared.');
+}
+
+function loadSession(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var data = JSON.parse(e.target.result);
+      if (!data.inventory || !Array.isArray(data.inventory)) throw new Error('Invalid file');
+      var added = 0;
+      data.inventory.forEach(function(item) {
+        if (item.title && item.sku) {
+          var exists = inventory.some(function(i){ return i.sku === item.sku; });
+          if (!exists) { inventory.push(item); added++; }
+        }
+      });
+      renderQueue();
+      autosave();
+      showSessionMsg('Loaded ' + added + ' item' + (added !== 1 ? 's' : '') + (added < data.inventory.length ? ' (' + (data.inventory.length - added) + ' duplicate SKUs skipped)' : '') + '.');
+    } catch(err) {
+      showSessionMsg('Could not read file — is it a valid session JSON?', true);
+    }
+    event.target.value = '';
+  };
+  reader.readAsText(file);
+}
+// ── Item photo ────────────────────────────────────────────────────────────────
+window._itemPhotoDataUrl = null;
+
+function handleItemPhoto(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  // Small thumbnail keeps the autosaved queue within the browser's storage limit
+  prepareImage(file, 600, function(dataUrl) {
+    window._itemPhotoDataUrl = dataUrl;
+    var preview = document.getElementById('item-photo-preview');
+    var wrap = document.getElementById('item-photo-preview-wrap');
+    var name = document.getElementById('item-photo-name');
+    preview.src = dataUrl;
+    wrap.style.display = 'inline-block';
+    name.textContent = file.name;
+  });
+}
+
+function clearItemPhoto() {
+  window._itemPhotoDataUrl = null;
+  var preview = document.getElementById('item-photo-preview');
+  var wrap = document.getElementById('item-photo-preview-wrap');
+  var name = document.getElementById('item-photo-name');
+  var fileInput = document.getElementById('item-photo-file');
+  if (preview) preview.src = '';
+  if (wrap) wrap.style.display = 'none';
+  if (name) name.textContent = '';
+  if (fileInput) fileInput.value = '';
+}
+
+// ── Invoice scan ──────────────────────────────────────────────────────────────
+window._invoiceDataUrl = null;
+
+function readImageFile(file, callback) {
+  var reader = new FileReader();
+  reader.onload = function(e) { callback(e.target.result); };
+  reader.readAsDataURL(file);
+}
+
+// Scales an image down to maxSide pixels and re-encodes it as JPEG, so phone
+// photos fit the API's size limit and HEIC becomes JPEG where the browser can
+// decode it (Safari). If the browser can't decode the file, the original is
+// passed through and `converted` is false.
+function prepareImage(file, maxSide, callback) {
+  readImageFile(file, function(dataUrl) {
+    var img = new Image();
+    img.onload = function() {
+      var scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+      var canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+      var ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      callback(canvas.toDataURL('image/jpeg', 0.85), true);
+    };
+    img.onerror = function() { callback(dataUrl, false); };
+    img.src = dataUrl;
+  });
+}
+
+function setParseStatus(msg, type) {
+  var el = document.getElementById('parse-status');
+  el.textContent = msg;
+  el.className = 'parse-status' + (type ? ' ' + type : '');
+  el.classList.add('active');
+  if (!msg) el.classList.remove('active');
+}
+
+function handleDragOver(e) {
+  e.preventDefault();
+  document.getElementById('invoice-drop').classList.add('drag-over');
+}
+function handleDragLeave(e) {
+  document.getElementById('invoice-drop').classList.remove('drag-over');
+}
+function handleInvoiceDrop(e) {
+  e.preventDefault();
+  document.getElementById('invoice-drop').classList.remove('drag-over');
+  var file = e.dataTransfer.files[0];
+  if (file) loadInvoiceFile(file);
+}
+function handleInvoiceFile(event) {
+  var file = event.target.files[0];
+  if (file) loadInvoiceFile(file);
+}
+
+function loadInvoiceFile(file) {
+  var allowed = ['image/jpeg','image/jpg','image/png','image/heic','image/heif'];
+  var extOk = /\.(jpe?g|png|heic|heif)$/i.test(file.name);
+  if (!allowed.includes(file.type) && !extOk) {
+    setParseStatus('Unsupported file type. Please use HEIC, JPG, JPEG, or PNG.', 'error');
+    return;
+  }
+  prepareImage(file, 2000, function(dataUrl, converted) {
+    window._invoiceDataUrl = dataUrl;
+    var img = document.getElementById('invoice-img');
+    var preview = document.getElementById('invoice-preview');
+    preview.querySelector('p') && preview.querySelector('p').remove();
+    // This browser couldn't decode the file (usually HEIC outside Safari) — show a placeholder
+    if (!converted) {
+      img.src = '';
+      img.alt = 'File loaded: ' + file.name;
+      img.style.display = 'none';
+      var note = document.createElement('p');
+      note.style.cssText = 'font-size:13px;color:var(--text-muted);margin-bottom:8px;';
+      note.textContent = '📄 Loaded: ' + file.name;
+      preview.insertBefore(note, preview.firstChild);
+    } else {
+      img.src = dataUrl;
+      img.style.display = 'block';
+      img.alt = 'Invoice preview';
+    }
+    preview.style.display = 'block';
+    setParseStatus('');
+    parseInvoice();
+  });
+}
+
+function clearInvoice() {
+  window._invoiceDataUrl = null;
+  document.getElementById('invoice-img').src = '';
+  document.getElementById('invoice-preview').style.display = 'none';
+  document.getElementById('invoice-file').value = '';
+  setParseStatus('');
+}
+
+async function parseInvoice() {
+  if (!window._invoiceDataUrl) return;
+  setParseStatus('Reading invoice…', '');
+
+  var base64 = window._invoiceDataUrl.split(',')[1];
+  var mimeMatch = window._invoiceDataUrl.match(/^data:([^;]+);/);
+  var mime = mimeMatch ? mimeMatch[1] : '';
+
+  try {
+    var result = await callApi('/api/scan-invoice', { image: base64, mediaType: mime });
+    var data = result.fields;
+
+    // Populate form fields
+    if (data.title) setField('f-title', data.title);
+    if (data.metal) setSelect('f-metal', data.metal);
+    if (data.category) setSelect('f-category', data.category);
+    if (data.condition) setSelect('f-condition', data.condition);
+    if (data.weight_g) setField('f-weight', data.weight_g);
+    if (data.length) setField('f-length', data.length);
+    if (data.width) setField('f-width', data.width);
+    if (data.dim_unit) {
+      var radios = document.querySelectorAll('input[name="dim-unit"]');
+      radios.forEach(function(r) { r.checked = (r.value === data.dim_unit); });
+      updateDimLabels();
+    }
+    if (data.ring_size) setField('f-size', data.ring_size);
+    if (data.stone) setField('f-stone', data.stone);
+    if (data.stone_detail) setField('f-stone-detail', data.stone_detail);
+    if (data.cost) setField('f-cost', data.cost);
+    if (data.price) setField('f-price', data.price);
+    if (data.qty) setField('f-qty', data.qty);
+    if (data.vendor) setField('f-vendor', data.vendor);
+    if (data.purchase_date) setField('f-purchase-date', data.purchase_date);
+
+    var filled = Object.values(data).filter(function(v){ return v && v !== ''; }).length;
+    setParseStatus('✓ Found ' + filled + ' field' + (filled !== 1 ? 's' : '') + ' — review and adjust as needed.', 'success');
+  } catch(e) {
+    setParseStatus('Could not read the invoice (' + e.message + '). Please fill in the fields manually.', 'error');
+  }
+}
+
+function setField(id, val) {
+  var el = document.getElementById(id);
+  if (el && val !== undefined && val !== null && val !== '') el.value = val;
+}
+
+function setSelect(id, val) {
+  var el = document.getElementById(id);
+  if (!el || !val) return;
+  // Try exact match first, then case-insensitive partial
+  for (var i = 0; i < el.options.length; i++) {
+    if (el.options[i].value.toLowerCase() === val.toLowerCase()) { el.selectedIndex = i; return; }
+  }
+  for (var i = 0; i < el.options.length; i++) {
+    if (el.options[i].value.toLowerCase().includes(val.toLowerCase()) || val.toLowerCase().includes(el.options[i].value.toLowerCase())) {
+      el.selectedIndex = i; return;
+    }
+  }
+}
+</script>
+</body>
+</html>
