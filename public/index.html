@@ -163,8 +163,12 @@
 
 <header>
   <h1>Jewelry Inventory</h1>
-  <span>offline intake tool</span>
-  <div style="margin-left: auto; display: flex; gap: 8px; align-items: center;">
+  <span>intake tool</span>
+  <div style="margin-left: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+    <label style="margin:0; display:inline-flex; align-items:center; gap:6px;" title="Goes at the start of auto-generated SKUs so they never clash with teammates' SKUs">
+      Your initials
+      <input id="f-initials" type="text" maxlength="4" placeholder="AB" oninput="saveInitials()" style="width:56px; padding:4px 6px; font-size:12px; text-transform:uppercase;" />
+    </label>
     <span id="autosave-status" style="font-size:11px; color:var(--text-subtle); font-family:'Courier New',monospace;"></span>
     <button class="sm" onclick="saveSession()" style="font-size:12px;">↓ Export session</button>
     <label style="margin:0; cursor:pointer;">
@@ -215,7 +219,7 @@
 
   <div class="row col-2">
     <div><label>Title <span>*</span></label><input id="f-title" type="text" placeholder="e.g. 14k Gold Solitaire Ring" /></div>
-    <div><label>SKU / Item ID</label><input id="f-sku" type="text" placeholder="auto-generated if blank" /></div>
+    <div><label>SKU / Item ID</label><input id="f-sku" type="text" placeholder="auto-generated from your initials if blank" /></div>
   </div>
 
   <div class="row col-3">
@@ -364,6 +368,26 @@ function autoRestore() {
 
 window.addEventListener('load', autoRestore);
 
+// ── SKUs ──────────────────────────────────────────────────────────────────────
+// Each person works in their own browser, so auto-generated SKUs start with
+// their initials (AF-RI-001) to stay unique across the team. The per-prefix
+// counter is remembered separately from the queue, so removing or exporting
+// items never makes a number get handed out twice.
+var INITIALS_KEY = 'jewelry_inventory_initials';
+var SKU_COUNTERS_KEY = 'jewelry_inventory_sku_counters';
+
+function getInitials() {
+  return v('f-initials').toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+function saveInitials() {
+  try { localStorage.setItem(INITIALS_KEY, getInitials()); } catch(e) {}
+}
+
+window.addEventListener('load', function() {
+  try { document.getElementById('f-initials').value = localStorage.getItem(INITIALS_KEY) || ''; } catch(e) {}
+});
+
 var SHOTS = [
   {slot:'01', label:'Main — full item, white background'},
   {slot:'02', label:'Front close-up'},
@@ -394,10 +418,20 @@ function showError(msg) {
   el.style.display = msg ? 'block' : 'none';
 }
 
-function autoSKU() {
-  var cat = v('f-category');
-  var prefix = cat ? cat.substring(0,2).toUpperCase() : 'IT';
-  return prefix + '-' + String(inventory.length + 1).padStart(3,'0');
+function autoSKU(category) {
+  var prefix = getInitials() + '-' + (category ? category.substring(0,2).toUpperCase() : 'IT');
+  var counters = {};
+  try { counters = JSON.parse(localStorage.getItem(SKU_COUNTERS_KEY)) || {}; } catch(e) {}
+  var n = counters[prefix] || 0;
+  var pattern = new RegExp('^' + prefix + '-(\\d+)$');
+  inventory.forEach(function(item) {
+    var m = String(item.sku).match(pattern);
+    if (m) n = Math.max(n, parseInt(m[1], 10));
+  });
+  n++;
+  counters[prefix] = n;
+  try { localStorage.setItem(SKU_COUNTERS_KEY, JSON.stringify(counters)); } catch(e) {}
+  return prefix + '-' + String(n).padStart(3,'0');
 }
 
 function gatherFormData() {
@@ -424,38 +458,31 @@ function gatherFormData() {
   };
 }
 
-function buildPrompt(data) {
-  var parts = [];
-  if (data.metal) parts.push('Metal: ' + data.metal);
-  if (data.category) parts.push('Category: ' + data.category);
-  if (data.condition) parts.push('Condition: ' + data.condition);
-  if (data.stone) parts.push('Stone: ' + data.stone + (data.stoneDetail ? ' (' + data.stoneDetail + ')' : ''));
-  if (data.size) parts.push('Size: ' + data.size);
-  if (data.weight) parts.push('Weight: ' + data.weight + 'g');
-  if (data.length || data.width) parts.push('Dimensions: ' + [data.length ? data.length + data.dimUnit + ' length' : '', data.width ? data.width + data.dimUnit + ' width' : ''].filter(Boolean).join(', '));
-  if (data.desc) parts.push('Additional notes: ' + data.desc);
-  return 'Write a compelling, accurate product listing description for an online jewelry store. '
-    + 'Item: ' + data.title + '. '
-    + parts.join('. ') + '. '
-    + 'Write 2-3 sentences. Professional tone, no fluff, no made-up claims. '
-    + 'End with one sentence listing weight in grams'
-    + (data.length || data.width ? ' and dimensions' : '')
-    + '. Return only the description text, no headers or labels.';
+// Calls one of the server routes in functions/api/, which hold the Anthropic
+// API key. Throws with the server's explanation when something goes wrong.
+async function callApi(path, payload) {
+  var response = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  var result = null;
+  try { result = await response.json(); } catch(e) {}
+  if (!response.ok || !result) throw new Error((result && result.error) || 'Server error (' + response.status + ')');
+  return result;
 }
 
 async function generateDescription(data) {
-  var response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1000,
-      messages: [{ role: 'user', content: buildPrompt(data) }]
-    })
-  });
-  var result = await response.json();
-  if (result.content && result.content[0] && result.content[0].text) return result.content[0].text.trim();
-  throw new Error('No response from API');
+  var payload = Object.assign({}, data);
+  delete payload.photoDataUrl;
+  var result = await callApi('/api/describe', payload);
+  return result.description;
+}
+
+function showGenFallback(err) {
+  var genStatus = document.getElementById('gen-status');
+  genStatus.textContent = 'AI description unavailable (' + err.message + ') — used a basic description instead.';
+  genStatus.style.display = 'inline';
 }
 
 var pendingFormData = null;
@@ -463,6 +490,7 @@ var pendingFormData = null;
 async function handleAddClick() {
   var title = v('f-title');
   if (!title) { showError('Item title is required.'); return; }
+  if (!v('f-sku') && !getInitials()) { showError('Enter your initials at the top of the page — they start each auto-generated SKU so yours never clash with teammates\'.'); return; }
   showError('');
 
   var generatedWrap = document.getElementById('generated-desc-wrap');
@@ -480,6 +508,7 @@ async function handleAddClick() {
   pendingFormData = gatherFormData();
   addBtn.disabled = true;
   addBtn.textContent = 'Generating…';
+  genStatus.textContent = 'Generating description…';
   genStatus.style.display = 'inline';
 
   try {
@@ -495,7 +524,7 @@ async function handleAddClick() {
     generatedWrap.style.display = 'block';
     addBtn.disabled = false;
     addBtn.textContent = '✓ Confirm & add to queue';
-    genStatus.style.display = 'none';
+    showGenFallback(e);
   }
 }
 
@@ -503,13 +532,15 @@ async function regenerateDesc() {
   var data = pendingFormData || gatherFormData();
   var generatedField = document.getElementById('f-generated-desc');
   var genStatus = document.getElementById('gen-status');
+  genStatus.textContent = 'Generating description…';
   genStatus.style.display = 'inline';
   try {
     generatedField.value = await generateDescription(data);
+    genStatus.style.display = 'none';
   } catch(e) {
     generatedField.value = buildDesc(data);
+    showGenFallback(e);
   }
-  genStatus.style.display = 'none';
 }
 
 function addToInventory(generatedDesc) {
@@ -517,7 +548,7 @@ function addToInventory(generatedDesc) {
   var item = {
     id: Date.now(),
     title: data.title,
-    sku: data.sku || autoSKU(),
+    sku: data.sku || autoSKU(data.category),
     metal: data.metal,
     category: data.category,
     condition: data.condition,
@@ -872,7 +903,8 @@ window._itemPhotoDataUrl = null;
 function handleItemPhoto(event) {
   var file = event.target.files[0];
   if (!file) return;
-  readImageFile(file, function(dataUrl) {
+  // Small thumbnail keeps the autosaved queue within the browser's storage limit
+  prepareImage(file, 600, function(dataUrl) {
     window._itemPhotoDataUrl = dataUrl;
     var preview = document.getElementById('item-photo-preview');
     var wrap = document.getElementById('item-photo-preview-wrap');
@@ -899,10 +931,32 @@ function clearItemPhoto() {
 window._invoiceDataUrl = null;
 
 function readImageFile(file, callback) {
-  // For HEIC, we'll read as-is and let the API handle it via base64
   var reader = new FileReader();
   reader.onload = function(e) { callback(e.target.result); };
   reader.readAsDataURL(file);
+}
+
+// Scales an image down to maxSide pixels and re-encodes it as JPEG, so phone
+// photos fit the API's size limit and HEIC becomes JPEG where the browser can
+// decode it (Safari). If the browser can't decode the file, the original is
+// passed through and `converted` is false.
+function prepareImage(file, maxSide, callback) {
+  readImageFile(file, function(dataUrl) {
+    var img = new Image();
+    img.onload = function() {
+      var scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+      var canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+      var ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      callback(canvas.toDataURL('image/jpeg', 0.85), true);
+    };
+    img.onerror = function() { callback(dataUrl, false); };
+    img.src = dataUrl;
+  });
 }
 
 function setParseStatus(msg, type) {
@@ -938,19 +992,19 @@ function loadInvoiceFile(file) {
     setParseStatus('Unsupported file type. Please use HEIC, JPG, JPEG, or PNG.', 'error');
     return;
   }
-  readImageFile(file, function(dataUrl) {
+  prepareImage(file, 2000, function(dataUrl, converted) {
     window._invoiceDataUrl = dataUrl;
     var img = document.getElementById('invoice-img');
     var preview = document.getElementById('invoice-preview');
-    // HEIC files won't render in <img> in most browsers — show a placeholder
-    if (/heic|heif/i.test(file.type + file.name)) {
+    preview.querySelector('p') && preview.querySelector('p').remove();
+    // This browser couldn't decode the file (usually HEIC outside Safari) — show a placeholder
+    if (!converted) {
       img.src = '';
-      img.alt = 'HEIC file loaded: ' + file.name;
+      img.alt = 'File loaded: ' + file.name;
       img.style.display = 'none';
-      preview.querySelector('p') && preview.querySelector('p').remove();
       var note = document.createElement('p');
       note.style.cssText = 'font-size:13px;color:var(--text-muted);margin-bottom:8px;';
-      note.textContent = '📄 HEIC loaded: ' + file.name;
+      note.textContent = '📄 Loaded: ' + file.name;
       preview.insertBefore(note, preview.firstChild);
     } else {
       img.src = dataUrl;
@@ -977,39 +1031,11 @@ async function parseInvoice() {
 
   var base64 = window._invoiceDataUrl.split(',')[1];
   var mimeMatch = window._invoiceDataUrl.match(/^data:([^;]+);/);
-  var mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-  // Anthropic API doesn't support HEIC natively — treat as jpeg and let it try
-  if (mime === 'image/heic' || mime === 'image/heif') mime = 'image/jpeg';
-
-  var systemPrompt = 'You are an assistant that reads jewelry invoices or purchase receipts and extracts structured data. '
-    + 'Return ONLY a valid JSON object with these keys (use empty string if not found): '
-    + 'title, metal, category, condition, weight_g, length, width, dim_unit, ring_size, stone, stone_detail, cost, price, qty, vendor, purchase_date (YYYY-MM-DD format). '
-    + 'For metal, use one of: 14k Yellow Gold, 14k White Gold, 14k Rose Gold, 18k Yellow Gold, 18k White Gold, Sterling Silver, Platinum, Gold Filled, Gold Plated, Other. '
-    + 'For category, use one of: Ring, Necklace, Bracelet, Earrings, Pendant, Brooch, Anklet, Other. '
-    + 'For dim_unit use mm or in. Do not include any explanation or markdown.';
+  var mime = mimeMatch ? mimeMatch[1] : '';
 
   try {
-    var response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: mime, data: base64 } },
-            { type: 'text', text: 'Extract all jewelry item details from this invoice or receipt and return them as a JSON object.' }
-          ]
-        }],
-        system: systemPrompt
-      })
-    });
-
-    var result = await response.json();
-    var text = (result.content && result.content[0] && result.content[0].text) ? result.content[0].text.trim() : '';
-    var clean = text.replace(/```json|```/g, '').trim();
-    var data = JSON.parse(clean);
+    var result = await callApi('/api/scan-invoice', { image: base64, mediaType: mime });
+    var data = result.fields;
 
     // Populate form fields
     if (data.title) setField('f-title', data.title);
@@ -1036,7 +1062,7 @@ async function parseInvoice() {
     var filled = Object.values(data).filter(function(v){ return v && v !== ''; }).length;
     setParseStatus('✓ Found ' + filled + ' field' + (filled !== 1 ? 's' : '') + ' — review and adjust as needed.', 'success');
   } catch(e) {
-    setParseStatus('Could not read the invoice. Please fill in the fields manually.', 'error');
+    setParseStatus('Could not read the invoice (' + e.message + '). Please fill in the fields manually.', 'error');
   }
 }
 

@@ -1,0 +1,14 @@
+{
+  "name": "jewelry-inventory-intake",
+  "private": true,
+  "description": "Jewelry inventory intake tool, hosted on Cloudflare Pages behind a shared password",
+  "scripts": {
+    "dev": "wrangler pages dev public --compatibility-date=2026-09-01"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.151.3"
+  }
+}
