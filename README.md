@@ -114,3 +114,4 @@ npm install
 printf 'APP_PASSWORD="choose-one"\nANTHROPIC_API_KEY="sk-ant-..."\n' > .dev.vars
 npm run dev    # http://localhost:8788
 ```
+
