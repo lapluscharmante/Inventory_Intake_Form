@@ -183,12 +183,12 @@
 <main>
 
 <section>
-  <h2>Invoice scan <span style="font-size:11px; font-weight:normal; letter-spacing:0; text-transform:none; color:var(--text-subtle);">optional — auto-fills the form below</span></h2>
+  <h2>Invoice scan <span style="font-size:11px; font-weight:normal; letter-spacing:0; text-transform:none; color:var(--text-subtle);">optional — adds every item on the invoice to the queue, translated to English</span></h2>
   <div class="drop-zone" id="invoice-drop" onclick="document.getElementById('invoice-file').click()" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleInvoiceDrop(event)">
     <p class="label">📄 Drop invoice photo here or tap to choose</p>
-    <p>Accepts HEIC, JPG, JPEG, PNG</p>
+    <p>Accepts PDF, HEIC, JPG, JPEG, PNG</p>
   </div>
-  <input type="file" id="invoice-file" accept=".heic,.heif,.jpg,.jpeg,.png,image/heic,image/heif,image/jpeg,image/png" style="display:none;" onchange="handleInvoiceFile(event)" />
+  <input type="file" id="invoice-file" accept=".pdf,.heic,.heif,.jpg,.jpeg,.png,application/pdf,image/heic,image/heif,image/jpeg,image/png" style="display:none;" onchange="handleInvoiceFile(event)" />
   <div class="invoice-preview" id="invoice-preview">
     <img id="invoice-img" src="" alt="Invoice preview" />
     <div style="margin-top:8px; display:flex; gap:8px; align-items:center;">
@@ -543,10 +543,19 @@ async function regenerateDesc() {
   }
 }
 
-function addToInventory(generatedDesc) {
-  var data = pendingFormData || gatherFormData();
-  var item = {
-    id: Date.now(),
+// Items added in the same millisecond (e.g. from one invoice) still get unique ids
+var lastItemId = 0;
+function nextItemId() {
+  lastItemId = Math.max(Date.now(), lastItemId + 1);
+  return lastItemId;
+}
+
+// Id of the queue item loaded into the form by Edit; saving replaces it in place
+var editingId = null;
+
+function createItem(data, desc) {
+  return {
+    id: nextItemId(),
     title: data.title,
     sku: data.sku || autoSKU(data.category),
     metal: data.metal,
@@ -564,11 +573,24 @@ function addToInventory(generatedDesc) {
     qty: data.qty || '1',
     vendor: data.vendor,
     purchaseDate: data.purchaseDate,
-    desc: generatedDesc || buildDesc(data),
+    desc: desc || buildDesc(data),
     photoDataUrl: data.photoDataUrl || null,
+    currency: data.currency || '',
     date: new Date().toLocaleDateString()
   };
-  inventory.push(item);
+}
+
+function addToInventory(generatedDesc) {
+  var data = pendingFormData || gatherFormData();
+  var item = createItem(data, generatedDesc);
+  var editIndex = editingId === null ? -1 : inventory.findIndex(function(i){ return i.id === editingId; });
+  if (editIndex >= 0) {
+    item.id = editingId;
+    item.currency = inventory[editIndex].currency || '';
+    inventory[editIndex] = item;
+  } else {
+    inventory.push(item);
+  }
   renderQueue();
   autosave();
   var shouldPrint = document.getElementById('print-on-add').checked;
@@ -577,9 +599,45 @@ function addToInventory(generatedDesc) {
 }
 
 function removeItem(id) {
+  if (id === editingId) editingId = null;
   inventory = inventory.filter(function(i){ return i.id !== id; });
   renderQueue();
   autosave();
+}
+
+function editItem(id) {
+  var item = inventory.find(function(i){ return i.id === id; });
+  if (!item) return;
+  if (v('f-title') && !confirm('Replace what\'s currently in the form with this item?')) return;
+  clearForm();
+  editingId = id;
+  setField('f-title', item.title);
+  setField('f-sku', item.sku);
+  setSelect('f-metal', item.metal);
+  setSelect('f-category', item.category);
+  setSelect('f-condition', item.condition);
+  setField('f-weight', item.weight);
+  setField('f-length', item.length);
+  setField('f-width', item.width);
+  document.querySelectorAll('input[name="dim-unit"]').forEach(function(r) { r.checked = (r.value === (item.dimUnit || 'mm')); });
+  updateDimLabels();
+  setField('f-size', item.size);
+  setField('f-stone', item.stone);
+  setField('f-stone-detail', item.stoneDetail);
+  setField('f-cost', item.cost);
+  setField('f-price', item.price);
+  setField('f-qty', item.qty);
+  setField('f-vendor', item.vendor);
+  setField('f-purchase-date', item.purchaseDate);
+  if (item.photoDataUrl) {
+    window._itemPhotoDataUrl = item.photoDataUrl;
+    document.getElementById('item-photo-preview').src = item.photoDataUrl;
+    document.getElementById('item-photo-preview-wrap').style.display = 'inline-block';
+  }
+  document.getElementById('f-generated-desc').value = item.desc || '';
+  document.getElementById('generated-desc-wrap').style.display = 'block';
+  document.getElementById('add-btn').textContent = '✓ Save changes';
+  document.getElementById('f-title').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 function renderQueue() {
@@ -590,7 +648,8 @@ function renderQueue() {
   section.style.display = 'block';
   count.textContent = '(' + inventory.length + ' item' + (inventory.length !== 1 ? 's' : '') + ')';
   list.innerHTML = inventory.map(function(item) {
-    var meta = [item.sku, item.metal, item.category, item.weight ? item.weight+'g' : '', item.price ? '$'+item.price : '', 'qty '+item.qty, item.vendor, item.purchaseDate].filter(Boolean).join(' · ');
+    var money = item.currency ? item.currency + ' ' : '$';
+    var meta = [item.sku, item.metal, item.category, item.weight ? item.weight+'g' : '', item.price ? money+item.price : '', item.cost ? 'cost '+money+item.cost : '', 'qty '+item.qty, item.vendor, item.purchaseDate].filter(Boolean).join(' · ');
     var thumb = item.photoDataUrl ? '<img class="item-thumb" src="' + item.photoDataUrl + '" alt="Item photo" />' : '';
     return '<div class="item-row">'
       + thumb
@@ -599,6 +658,7 @@ function renderQueue() {
       + '<div class="item-meta">' + escapeHtml(meta) + '</div>'
       + '</div>'
       + '<div class="item-actions">'
+      + '<button class="sm" onclick="editItem('+item.id+')">✎ Edit</button>'
       + '<button class="sm" onclick="printTag('+item.id+')">⬡ Tag</button>'
       + '<button class="sm danger" onclick="removeItem('+item.id+')">✕</button>'
       + '</div>'
@@ -621,6 +681,7 @@ function clearForm() {
   var genStatus = document.getElementById('gen-status');
   if (genStatus) genStatus.style.display = 'none';
   pendingFormData = null;
+  editingId = null;
   clearItemPhoto();
   showError('');
 }
@@ -929,6 +990,8 @@ function clearItemPhoto() {
 
 // ── Invoice scan ──────────────────────────────────────────────────────────────
 window._invoiceDataUrl = null;
+window._invoiceMediaType = '';
+var MAX_PDF_BYTES = 20 * 1024 * 1024;
 
 function readImageFile(file, callback) {
   var reader = new FileReader();
@@ -986,84 +1049,163 @@ function handleInvoiceFile(event) {
 }
 
 function loadInvoiceFile(file) {
+  var isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
   var allowed = ['image/jpeg','image/jpg','image/png','image/heic','image/heif'];
   var extOk = /\.(jpe?g|png|heic|heif)$/i.test(file.name);
-  if (!allowed.includes(file.type) && !extOk) {
-    setParseStatus('Unsupported file type. Please use HEIC, JPG, JPEG, or PNG.', 'error');
+  if (!isPdf && !allowed.includes(file.type) && !extOk) {
+    setParseStatus('Unsupported file type. Please use PDF, HEIC, JPG, JPEG, or PNG.', 'error');
+    return;
+  }
+  if (isPdf) {
+    if (file.size > MAX_PDF_BYTES) {
+      setParseStatus('That PDF is too large (over 20 MB). Try exporting just the invoice page.', 'error');
+      return;
+    }
+    // PDFs go to Claude as-is; the type is set explicitly because some
+    // devices report an empty or generic type for PDF files.
+    readImageFile(file, function(dataUrl) {
+      showInvoicePreview(dataUrl, 'application/pdf', null, file.name);
+    });
     return;
   }
   prepareImage(file, 2000, function(dataUrl, converted) {
-    window._invoiceDataUrl = dataUrl;
-    var img = document.getElementById('invoice-img');
-    var preview = document.getElementById('invoice-preview');
-    preview.querySelector('p') && preview.querySelector('p').remove();
-    // This browser couldn't decode the file (usually HEIC outside Safari) — show a placeholder
-    if (!converted) {
-      img.src = '';
-      img.alt = 'File loaded: ' + file.name;
-      img.style.display = 'none';
-      var note = document.createElement('p');
-      note.style.cssText = 'font-size:13px;color:var(--text-muted);margin-bottom:8px;';
-      note.textContent = '📄 Loaded: ' + file.name;
-      preview.insertBefore(note, preview.firstChild);
-    } else {
-      img.src = dataUrl;
-      img.style.display = 'block';
-      img.alt = 'Invoice preview';
-    }
-    preview.style.display = 'block';
-    setParseStatus('');
-    parseInvoice();
+    var mimeMatch = dataUrl.match(/^data:([^;]+);/);
+    // This browser couldn't decode the file (usually HEIC outside Safari) — no preview
+    showInvoicePreview(dataUrl, mimeMatch ? mimeMatch[1] : '', converted ? dataUrl : null, file.name);
   });
+}
+
+// previewSrc is null when there's no image to show (PDFs, undecodable HEIC);
+// a note with the file name is shown instead.
+function showInvoicePreview(dataUrl, mediaType, previewSrc, fileName) {
+  window._invoiceDataUrl = dataUrl;
+  window._invoiceMediaType = mediaType;
+  window._invoiceAddedIds = [];
+  var img = document.getElementById('invoice-img');
+  var preview = document.getElementById('invoice-preview');
+  preview.querySelector('p') && preview.querySelector('p').remove();
+  if (!previewSrc) {
+    img.src = '';
+    img.alt = 'File loaded: ' + fileName;
+    img.style.display = 'none';
+    var note = document.createElement('p');
+    note.style.cssText = 'font-size:13px;color:var(--text-muted);margin-bottom:8px;';
+    note.textContent = '📄 Loaded: ' + fileName;
+    preview.insertBefore(note, preview.firstChild);
+  } else {
+    img.src = previewSrc;
+    img.style.display = 'block';
+    img.alt = 'Invoice preview';
+  }
+  preview.style.display = 'block';
+  setParseStatus('');
+  parseInvoice();
 }
 
 function clearInvoice() {
   window._invoiceDataUrl = null;
+  window._invoiceMediaType = '';
   document.getElementById('invoice-img').src = '';
   document.getElementById('invoice-preview').style.display = 'none';
   document.getElementById('invoice-file').value = '';
   setParseStatus('');
 }
 
+// Ids of the queue items added from the invoice currently loaded, so a re-scan
+// doesn't silently add them all a second time
+window._invoiceAddedIds = [];
+
 async function parseInvoice() {
   if (!window._invoiceDataUrl) return;
+  if (!getInitials()) {
+    setParseStatus('Enter your initials at the top of the page first — they start each item\'s SKU.', 'error');
+    return;
+  }
+  var already = window._invoiceAddedIds.filter(function(id) { return inventory.some(function(i){ return i.id === id; }); });
+  if (already.length && !confirm(already.length + ' item' + (already.length !== 1 ? 's' : '') + ' from this invoice ' + (already.length !== 1 ? 'are' : 'is') + ' already in the queue. Add the invoice\'s items again?')) return;
   setParseStatus('Reading invoice…', '');
 
   var base64 = window._invoiceDataUrl.split(',')[1];
-  var mimeMatch = window._invoiceDataUrl.match(/^data:([^;]+);/);
-  var mime = mimeMatch ? mimeMatch[1] : '';
 
   try {
-    var result = await callApi('/api/scan-invoice', { image: base64, mediaType: mime });
-    var data = result.fields;
-
-    // Populate form fields
-    if (data.title) setField('f-title', data.title);
-    if (data.metal) setSelect('f-metal', data.metal);
-    if (data.category) setSelect('f-category', data.category);
-    if (data.condition) setSelect('f-condition', data.condition);
-    if (data.weight_g) setField('f-weight', data.weight_g);
-    if (data.length) setField('f-length', data.length);
-    if (data.width) setField('f-width', data.width);
-    if (data.dim_unit) {
-      var radios = document.querySelectorAll('input[name="dim-unit"]');
-      radios.forEach(function(r) { r.checked = (r.value === data.dim_unit); });
-      updateDimLabels();
+    var result = await callApi('/api/scan-invoice', { image: base64, mediaType: window._invoiceMediaType });
+    var invoice = result.invoice;
+    if (!invoice.items || !invoice.items.length) {
+      setParseStatus('No jewelry items were found on this invoice. Please fill in the form manually.', 'error');
+      return;
     }
-    if (data.ring_size) setField('f-size', data.ring_size);
-    if (data.stone) setField('f-stone', data.stone);
-    if (data.stone_detail) setField('f-stone-detail', data.stone_detail);
-    if (data.cost) setField('f-cost', data.cost);
-    if (data.price) setField('f-price', data.price);
-    if (data.qty) setField('f-qty', data.qty);
-    if (data.vendor) setField('f-vendor', data.vendor);
-    if (data.purchase_date) setField('f-purchase-date', data.purchase_date);
+    var foreignCurrency = invoice.currency && invoice.currency.toUpperCase() !== 'USD' ? invoice.currency.toUpperCase() : '';
+    var datas = invoice.items.map(function(line) { return itemDataFromInvoice(line, invoice, foreignCurrency); });
 
-    var filled = Object.values(data).filter(function(v){ return v && v !== ''; }).length;
-    setParseStatus('✓ Found ' + filled + ' field' + (filled !== 1 ? 's' : '') + ' — review and adjust as needed.', 'success');
+    // Write descriptions a few at a time, keeping the invoice's order
+    var descs = new Array(datas.length);
+    var next = 0, done = 0, failed = 0;
+    var total = datas.length;
+    var progress = function() { setParseStatus('Found ' + total + ' item' + (total !== 1 ? 's' : '') + ' — writing descriptions (' + done + ' of ' + total + ')…', ''); };
+    progress();
+    async function worker() {
+      while (next < total) {
+        var i = next++;
+        try { descs[i] = await generateDescription(datas[i]); }
+        catch(e) { descs[i] = buildDesc(datas[i]); failed++; }
+        done++;
+        progress();
+      }
+    }
+    await Promise.all([worker(), worker(), worker()]);
+
+    var added = datas.map(function(data, i) {
+      var item = createItem(data, descs[i]);
+      inventory.push(item);
+      return item.id;
+    });
+    window._invoiceAddedIds = window._invoiceAddedIds.concat(added);
+    renderQueue();
+    autosave();
+
+    var msg = '✓ Added ' + total + ' item' + (total !== 1 ? 's' : '') + ' to the queue';
+    if (invoice.language && invoice.language.toLowerCase() !== 'english') msg += ', translated from ' + invoice.language;
+    msg += '. Review them below and use ✎ Edit to fix anything.';
+    if (foreignCurrency) msg += ' Prices are in ' + foreignCurrency + ' as on the invoice — they were not converted to dollars.';
+    if (failed) msg += ' ' + failed + ' description' + (failed !== 1 ? 's' : '') + ' couldn\'t be written by AI, so a basic one was used.';
+    setParseStatus(msg, 'success');
   } catch(e) {
     setParseStatus('Could not read the invoice (' + e.message + '). Please fill in the fields manually.', 'error');
   }
+}
+
+function itemDataFromInvoice(line, invoice, currency) {
+  // Plain number with a period decimal, also handling European "1.250,50" or "2,1"
+  var num = function(s) {
+    s = String(s || '').replace(/[^0-9.,]/g, '');
+    var lastComma = s.lastIndexOf(',');
+    if (lastComma > s.lastIndexOf('.') && /,\d{1,2}$/.test(s)) {
+      return s.slice(0, lastComma).replace(/[.,]/g, '') + '.' + s.slice(lastComma + 1);
+    }
+    return s.replace(/,/g, '');
+  };
+  return {
+    title: line.title || 'Untitled item',
+    sku: '',
+    metal: line.metal,
+    category: line.category,
+    condition: line.condition,
+    weight: num(line.weight_g),
+    length: num(line.length),
+    width: num(line.width),
+    dimUnit: line.dim_unit || 'mm',
+    size: line.ring_size,
+    stone: line.stone,
+    stoneDetail: line.stone_detail,
+    cost: num(line.cost),
+    price: num(line.price),
+    qty: num(line.qty) || '1',
+    vendor: invoice.vendor,
+    purchaseDate: invoice.purchase_date,
+    desc: line.notes,
+    photoDataUrl: null,
+    currency: currency
+  };
 }
 
 function setField(id, val) {
