@@ -94,6 +94,11 @@ access.
 
 ## Notes
 
+- Invoice scan adds **every jewelry item** on the invoice straight to the
+  queue, each with its own AI description. Invoices in other languages are
+  translated into English. Prices stay in the invoice's currency (the tool
+  says when that isn't dollars) — convert them before exporting. Use
+  **✎ Edit** on a queue item to correct it or add a photo.
 - Invoice scan accepts PDFs (up to 20 MB) as well as photos. Photos are
   shrunk and converted to JPEG in the browser before scanning. HEIC photos
   only convert in Safari (iPhone or Mac). In other browsers, save the invoice

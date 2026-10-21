@@ -35,7 +35,7 @@ function buildPrompt(data) {
   return 'Write a compelling, accurate product listing description for an online jewelry store. '
     + 'Item: ' + field('title') + '. '
     + parts.join('. ') + '. '
-    + 'Write 2-3 sentences. Professional tone, no fluff, no made-up claims. '
+    + 'Write 2-3 sentences in English, even if any details above are in another language. Professional tone, no fluff, no made-up claims. '
     + 'End with one sentence listing weight in grams'
     + (field('length') || field('width') ? ' and dimensions' : '')
     + '. Return only the description text, no headers or labels.';
