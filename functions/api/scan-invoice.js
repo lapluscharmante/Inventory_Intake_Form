@@ -1,9 +1,9 @@
-// POST /api/scan-invoice — reads a photo of an invoice or receipt and returns
+// POST /api/scan-invoice — reads a photo or PDF of an invoice or receipt and returns
 // the jewelry item details it finds, in the same shape the form fields use.
 
 import { askClaude, errorResponse, jsonResponse, readJson, HttpError } from '../../lib/claude.js';
 
-const SUPPORTED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 const METALS = ['14k Yellow Gold', '14k White Gold', '14k Rose Gold', '18k Yellow Gold', '18k White Gold', 'Sterling Silver', 'Platinum', 'Gold Filled', 'Gold Plated', 'Other'];
 const CATEGORIES = ['Ring', 'Necklace', 'Bracelet', 'Earrings', 'Pendant', 'Brooch', 'Anklet', 'Other'];
 const CONDITIONS = ['New', 'Excellent', 'Very Good', 'Good', 'Fair'];
@@ -44,16 +44,21 @@ const SYSTEM = 'You read jewelry invoices or purchase receipts and extract struc
 export async function onRequestPost({ request, env }) {
   try {
     const { image, mediaType } = await readJson(request);
-    if (typeof image !== 'string' || !image) throw new HttpError(400, 'No invoice image was sent.');
-    if (!SUPPORTED_TYPES.includes(mediaType)) {
-      throw new HttpError(415, 'This image format can\'t be read. Use a JPG or PNG (HEIC only works when opened in Safari).');
+    if (typeof image !== 'string' || !image) throw new HttpError(400, 'No invoice file was sent.');
+    let fileBlock;
+    if (mediaType === 'application/pdf') {
+      fileBlock = { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: image } };
+    } else if (IMAGE_TYPES.includes(mediaType)) {
+      fileBlock = { type: 'image', source: { type: 'base64', media_type: mediaType, data: image } };
+    } else {
+      throw new HttpError(415, 'This file format can\'t be read. Use a PDF, JPG or PNG (HEIC only works when opened in Safari).');
     }
 
     const text = await askClaude(env, {
       system: SYSTEM,
       outputFormat: OUTPUT_FORMAT,
       content: [
-        { type: 'image', source: { type: 'base64', media_type: mediaType, data: image } },
+        fileBlock,
         { type: 'text', text: 'Extract the jewelry item details from this invoice or receipt.' },
       ],
     });

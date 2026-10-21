@@ -94,9 +94,10 @@ access.
 
 ## Notes
 
-- Invoice photos are shrunk and converted to JPEG in the browser before
-  scanning. HEIC photos only convert in Safari (iPhone or Mac). In other
-  browsers, save the invoice as JPG or PNG first.
+- Invoice scan accepts PDFs (up to 20 MB) as well as photos. Photos are
+  shrunk and converted to JPEG in the browser before scanning. HEIC photos
+  only convert in Safari (iPhone or Mac). In other browsers, save the invoice
+  as JPG, PNG or PDF first.
 - AI requests use the `claude-opus-5-5` model at low effort. Each description
   or invoice scan costs a fraction of a cent. If the AI is unavailable, the
   tool says why and falls back to a basic description.

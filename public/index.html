@@ -186,9 +186,9 @@
   <h2>Invoice scan <span style="font-size:11px; font-weight:normal; letter-spacing:0; text-transform:none; color:var(--text-subtle);">optional — auto-fills the form below</span></h2>
   <div class="drop-zone" id="invoice-drop" onclick="document.getElementById('invoice-file').click()" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleInvoiceDrop(event)">
     <p class="label">📄 Drop invoice photo here or tap to choose</p>
-    <p>Accepts HEIC, JPG, JPEG, PNG</p>
+    <p>Accepts PDF, HEIC, JPG, JPEG, PNG</p>
   </div>
-  <input type="file" id="invoice-file" accept=".heic,.heif,.jpg,.jpeg,.png,image/heic,image/heif,image/jpeg,image/png" style="display:none;" onchange="handleInvoiceFile(event)" />
+  <input type="file" id="invoice-file" accept=".pdf,.heic,.heif,.jpg,.jpeg,.png,application/pdf,image/heic,image/heif,image/jpeg,image/png" style="display:none;" onchange="handleInvoiceFile(event)" />
   <div class="invoice-preview" id="invoice-preview">
     <img id="invoice-img" src="" alt="Invoice preview" />
     <div style="margin-top:8px; display:flex; gap:8px; align-items:center;">
@@ -929,6 +929,8 @@ function clearItemPhoto() {
 
 // ── Invoice scan ──────────────────────────────────────────────────────────────
 window._invoiceDataUrl = null;
+window._invoiceMediaType = '';
+var MAX_PDF_BYTES = 20 * 1024 * 1024;
 
 function readImageFile(file, callback) {
   var reader = new FileReader();
@@ -986,39 +988,61 @@ function handleInvoiceFile(event) {
 }
 
 function loadInvoiceFile(file) {
+  var isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
   var allowed = ['image/jpeg','image/jpg','image/png','image/heic','image/heif'];
   var extOk = /\.(jpe?g|png|heic|heif)$/i.test(file.name);
-  if (!allowed.includes(file.type) && !extOk) {
-    setParseStatus('Unsupported file type. Please use HEIC, JPG, JPEG, or PNG.', 'error');
+  if (!isPdf && !allowed.includes(file.type) && !extOk) {
+    setParseStatus('Unsupported file type. Please use PDF, HEIC, JPG, JPEG, or PNG.', 'error');
+    return;
+  }
+  if (isPdf) {
+    if (file.size > MAX_PDF_BYTES) {
+      setParseStatus('That PDF is too large (over 20 MB). Try exporting just the invoice page.', 'error');
+      return;
+    }
+    // PDFs go to Claude as-is; the type is set explicitly because some
+    // devices report an empty or generic type for PDF files.
+    readImageFile(file, function(dataUrl) {
+      showInvoicePreview(dataUrl, 'application/pdf', null, file.name);
+    });
     return;
   }
   prepareImage(file, 2000, function(dataUrl, converted) {
-    window._invoiceDataUrl = dataUrl;
-    var img = document.getElementById('invoice-img');
-    var preview = document.getElementById('invoice-preview');
-    preview.querySelector('p') && preview.querySelector('p').remove();
-    // This browser couldn't decode the file (usually HEIC outside Safari) — show a placeholder
-    if (!converted) {
-      img.src = '';
-      img.alt = 'File loaded: ' + file.name;
-      img.style.display = 'none';
-      var note = document.createElement('p');
-      note.style.cssText = 'font-size:13px;color:var(--text-muted);margin-bottom:8px;';
-      note.textContent = '📄 Loaded: ' + file.name;
-      preview.insertBefore(note, preview.firstChild);
-    } else {
-      img.src = dataUrl;
-      img.style.display = 'block';
-      img.alt = 'Invoice preview';
-    }
-    preview.style.display = 'block';
-    setParseStatus('');
-    parseInvoice();
+    var mimeMatch = dataUrl.match(/^data:([^;]+);/);
+    // This browser couldn't decode the file (usually HEIC outside Safari) — no preview
+    showInvoicePreview(dataUrl, mimeMatch ? mimeMatch[1] : '', converted ? dataUrl : null, file.name);
   });
+}
+
+// previewSrc is null when there's no image to show (PDFs, undecodable HEIC);
+// a note with the file name is shown instead.
+function showInvoicePreview(dataUrl, mediaType, previewSrc, fileName) {
+  window._invoiceDataUrl = dataUrl;
+  window._invoiceMediaType = mediaType;
+  var img = document.getElementById('invoice-img');
+  var preview = document.getElementById('invoice-preview');
+  preview.querySelector('p') && preview.querySelector('p').remove();
+  if (!previewSrc) {
+    img.src = '';
+    img.alt = 'File loaded: ' + fileName;
+    img.style.display = 'none';
+    var note = document.createElement('p');
+    note.style.cssText = 'font-size:13px;color:var(--text-muted);margin-bottom:8px;';
+    note.textContent = '📄 Loaded: ' + fileName;
+    preview.insertBefore(note, preview.firstChild);
+  } else {
+    img.src = previewSrc;
+    img.style.display = 'block';
+    img.alt = 'Invoice preview';
+  }
+  preview.style.display = 'block';
+  setParseStatus('');
+  parseInvoice();
 }
 
 function clearInvoice() {
   window._invoiceDataUrl = null;
+  window._invoiceMediaType = '';
   document.getElementById('invoice-img').src = '';
   document.getElementById('invoice-preview').style.display = 'none';
   document.getElementById('invoice-file').value = '';
@@ -1030,11 +1054,9 @@ async function parseInvoice() {
   setParseStatus('Reading invoice…', '');
 
   var base64 = window._invoiceDataUrl.split(',')[1];
-  var mimeMatch = window._invoiceDataUrl.match(/^data:([^;]+);/);
-  var mime = mimeMatch ? mimeMatch[1] : '';
 
   try {
-    var result = await callApi('/api/scan-invoice', { image: base64, mediaType: mime });
+    var result = await callApi('/api/scan-invoice', { image: base64, mediaType: window._invoiceMediaType });
     var data = result.fields;
 
     // Populate form fields
