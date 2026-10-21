@@ -576,6 +576,7 @@ function createItem(data, desc) {
     desc: desc || buildDesc(data),
     photoDataUrl: data.photoDataUrl || null,
     currency: data.currency || '',
+    converted: data.converted || null,
     date: new Date().toLocaleDateString()
   };
 }
@@ -587,6 +588,7 @@ function addToInventory(generatedDesc) {
   if (editIndex >= 0) {
     item.id = editingId;
     item.currency = inventory[editIndex].currency || '';
+    item.converted = inventory[editIndex].converted || null;
     inventory[editIndex] = item;
   } else {
     inventory.push(item);
@@ -649,7 +651,8 @@ function renderQueue() {
   count.textContent = '(' + inventory.length + ' item' + (inventory.length !== 1 ? 's' : '') + ')';
   list.innerHTML = inventory.map(function(item) {
     var money = item.currency ? item.currency + ' ' : '$';
-    var meta = [item.sku, item.metal, item.category, item.weight ? item.weight+'g' : '', item.price ? money+item.price : '', item.cost ? 'cost '+money+item.cost : '', 'qty '+item.qty, item.vendor, item.purchaseDate].filter(Boolean).join(' · ');
+    var converted = item.converted ? 'from ' + item.converted.currency + ' ' + [item.converted.cost, item.converted.price].filter(Boolean).join(' / ') + ' @ ' + formatRate(item.converted.rate) : '';
+    var meta = [item.sku, item.metal, item.category, item.weight ? item.weight+'g' : '', item.price ? money+item.price : '', item.cost ? 'cost '+money+item.cost : '', converted, 'qty '+item.qty, item.vendor, item.purchaseDate].filter(Boolean).join(' · ');
     var thumb = item.photoDataUrl ? '<img class="item-thumb" src="' + item.photoDataUrl + '" alt="Item photo" />' : '';
     return '<div class="item-row">'
       + thumb
@@ -1137,6 +1140,18 @@ async function parseInvoice() {
     var foreignCurrency = invoice.currency && invoice.currency.toUpperCase() !== 'USD' ? invoice.currency.toUpperCase() : '';
     var datas = invoice.items.map(function(line) { return itemDataFromInvoice(line, invoice, foreignCurrency); });
 
+    // Convert prices to dollars at the rate for the purchase date
+    var conversion = null, conversionError = '';
+    if (foreignCurrency) {
+      setParseStatus('Found ' + datas.length + ' item' + (datas.length !== 1 ? 's' : '') + ' — converting ' + foreignCurrency + ' prices to dollars…', '');
+      try {
+        conversion = await callApi('/api/exchange-rate', { from: foreignCurrency, date: invoice.purchase_date });
+        datas.forEach(function(data) { convertToUsd(data, conversion); });
+      } catch(e) {
+        conversionError = e.message;
+      }
+    }
+
     // Write descriptions a few at a time, keeping the invoice's order
     var descs = new Array(datas.length);
     var next = 0, done = 0, failed = 0;
@@ -1166,12 +1181,30 @@ async function parseInvoice() {
     var msg = '✓ Added ' + total + ' item' + (total !== 1 ? 's' : '') + ' to the queue';
     if (invoice.language && invoice.language.toLowerCase() !== 'english') msg += ', translated from ' + invoice.language;
     msg += '. Review them below and use ✎ Edit to fix anything.';
-    if (foreignCurrency) msg += ' Prices are in ' + foreignCurrency + ' as on the invoice — they were not converted to dollars.';
+    if (conversion) {
+      msg += ' Prices converted from ' + foreignCurrency + ' to dollars at 1 ' + foreignCurrency + ' = $' + formatRate(conversion.rate) + ' (rate for ' + conversion.date + ').';
+    } else if (foreignCurrency) {
+      msg += ' Prices are in ' + foreignCurrency + ' as on the invoice — they couldn\'t be converted to dollars (' + conversionError + '), so convert them with ✎ Edit before exporting.';
+    }
     if (failed) msg += ' ' + failed + ' description' + (failed !== 1 ? 's' : '') + ' couldn\'t be written by AI, so a basic one was used.';
     setParseStatus(msg, 'success');
   } catch(e) {
     setParseStatus('Could not read the invoice (' + e.message + '). Please fill in the fields manually.', 'error');
   }
+}
+
+// Replaces the item's cost and sale price with dollar amounts, keeping the
+// invoice's original figures alongside for reference.
+function convertToUsd(data, conversion) {
+  var toUsd = function(amount) { return amount ? (parseFloat(amount) * conversion.rate).toFixed(2) : ''; };
+  data.converted = { currency: data.currency, rate: conversion.rate, date: conversion.date, cost: data.cost, price: data.price };
+  data.cost = toUsd(data.cost);
+  data.price = toUsd(data.price);
+  data.currency = '';
+}
+
+function formatRate(rate) {
+  return rate >= 1 ? rate.toFixed(4) : rate.toPrecision(4);
 }
 
 function itemDataFromInvoice(line, invoice, currency) {
