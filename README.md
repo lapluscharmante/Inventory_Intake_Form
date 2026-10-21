@@ -96,8 +96,11 @@ access.
 
 - Invoice scan adds **every jewelry item** on the invoice straight to the
   queue, each with its own AI description. Invoices in other languages are
-  translated into English. Prices stay in the invoice's currency (the tool
-  says when that isn't dollars) — convert them before exporting. Use
+  translated into English. Prices in other currencies are converted to
+  dollars at the central-bank reference rate for the invoice's purchase date
+  (from the free [Frankfurter](https://frankfurter.dev) service), and the
+  original amounts and rate are shown on each queue item. If a rate isn't
+  available, prices stay in the invoice's currency and the tool says so. Use
   **✎ Edit** on a queue item to correct it or add a photo.
 - Invoice scan accepts PDFs (up to 20 MB) as well as photos. Photos are
   shrunk and converted to JPEG in the browser before scanning. HEIC photos
