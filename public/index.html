@@ -318,6 +318,7 @@
       <button class="sm etsy" onclick="exportCSV('etsy')">↓ Etsy CSV</button>
       <button class="sm ebay" onclick="exportCSV('ebay')">↓ eBay CSV</button>
       <button class="sm" onclick="printAllTags()">⬡ Print all tags</button>
+      <button class="sm" id="live-cards-btn" onclick="downloadLiveCards()">↓ IG Live cards</button>
       <button class="sm" onclick="togglePhotoGuide()">⌾ Photo names</button>
     </div>
   </div>
@@ -881,6 +882,150 @@ function printAllTags() {
   if (!inventory.length) return;
   var w = window.open('','_blank','width=720,height=600');
   if (w) { w.document.write(buildTagPage(inventory)); w.document.close(); }
+}
+
+// ── IG Live Sale cards ────────────────────────────────────────────────────────
+// One 4×6" card per queue item, sized for thermal mailing-label printers.
+// Black text only, no shading, so it prints cleanly on direct-thermal labels.
+var JSPDF_URL = 'https://cdn.jsdelivr.net/npm/jspdf@3.0.3/dist/jspdf.umd.min.js';
+var CARD_W = 4, CARD_H = 6, CARD_MARGIN = 0.3;
+
+function loadJsPDF() {
+  if (window.jspdf) return Promise.resolve(window.jspdf.jsPDF);
+  return new Promise(function(resolve, reject) {
+    var script = document.createElement('script');
+    script.src = JSPDF_URL;
+    script.onload = function() { window.jspdf ? resolve(window.jspdf.jsPDF) : reject(new Error('PDF library failed to load')); };
+    script.onerror = function() { reject(new Error('Could not load the PDF library — check your internet connection')); };
+    document.head.appendChild(script);
+  });
+}
+
+async function downloadLiveCards() {
+  if (!inventory.length) return;
+  var btn = document.getElementById('live-cards-btn');
+  btn.disabled = true;
+  btn.textContent = 'Making cards…';
+  try {
+    var jsPDF = await loadJsPDF();
+    var doc = new jsPDF({ orientation: 'portrait', unit: 'in', format: [CARD_W, CARD_H] });
+    inventory.forEach(function(item, i) {
+      if (i > 0) doc.addPage([CARD_W, CARD_H], 'portrait');
+      drawLiveCard(doc, item);
+    });
+    doc.save('ig_live_cards_' + new Date().toISOString().slice(0,10) + '.pdf');
+    showSessionMsg('Downloaded ' + inventory.length + ' IG Live card' + (inventory.length !== 1 ? 's' : '') + '.');
+  } catch(e) {
+    showSessionMsg('Couldn\'t make the cards: ' + e.message, true);
+  }
+  btn.disabled = false;
+  btn.textContent = '↓ IG Live cards';
+}
+
+function liveCardRows(item) {
+  var unit = item.dimUnit || 'mm';
+  var rows = [];
+  if (item.length || item.width) {
+    rows.push(['Size', [item.length, item.width].filter(Boolean).join(' × ') + ' ' + unit + (item.length && item.width ? ' (L × W)' : item.length ? ' long' : ' wide')]);
+  }
+  if (item.stone) rows.push(['Stone', item.stone + (item.stoneDetail ? ' — ' + item.stoneDetail : '')]);
+  if (item.size) rows.push(['Ring size', item.size]);
+  if (item.weight) rows.push(['Weight', item.weight + ' g']);
+  return rows;
+}
+
+// Keeps at most maxLines lines, ending the last with "…" when text was cut
+function clampLines(doc, lines, maxLines, width) {
+  if (lines.length <= maxLines) return lines;
+  lines = lines.slice(0, maxLines);
+  var last = lines[maxLines - 1];
+  while (last && doc.getTextWidth(last + '…') > width) last = last.slice(0, -1);
+  lines[maxLines - 1] = last.replace(/[\s,;—-]+$/, '') + '…';
+  return lines;
+}
+
+// "12500.00" -> "12,500.00", keeping whatever decimals were entered
+function formatPrice(amount) {
+  var parts = String(amount).split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return parts.join('.');
+}
+
+function drawLiveCard(doc, item) {
+  var left = CARD_MARGIN, width = CARD_W - 2 * CARD_MARGIN;
+  var lineH = function(pt) { return pt / 72 * 1.2; };
+  var y = CARD_MARGIN;
+
+  // Title: as large as fits in three lines
+  doc.setFont('helvetica', 'bold');
+  var titleSize = 28, titleLines;
+  do {
+    doc.setFontSize(titleSize);
+    titleLines = doc.splitTextToSize(item.title || 'Untitled item', width);
+    if (titleLines.length <= 3) break;
+    titleSize -= 2;
+  } while (titleSize > 14);
+  titleLines = clampLines(doc, titleLines, 3, width);
+  y += titleSize / 72;
+  doc.text(titleLines, left, y, { lineHeightFactor: 1.2 });
+  y += (titleLines.length - 1) * lineH(titleSize) + 0.18;
+
+  // SKU
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(16);
+  y += 16 / 72;
+  doc.text(item.sku || '', left, y);
+  y += 0.15;
+  doc.setLineWidth(0.02);
+  doc.line(left, y, left + width, y);
+  y += 0.25;
+
+  // Sale price (big) and condition sit at the bottom; work out where they start
+  var labelW = 1.05;
+  var bottom = CARD_H - CARD_MARGIN;
+  var priceY = bottom - (item.condition ? 0.45 : 0);
+  var money = item.currency ? item.currency + ' ' : '$';
+  var price = item.price ? money + formatPrice(item.price) : 'Price: ____';
+  doc.setFont('helvetica', 'bold');
+  var priceSize = 54;
+  doc.setFontSize(priceSize);
+  while (doc.getTextWidth(price) > width && priceSize > 24) { priceSize -= 4; doc.setFontSize(priceSize); }
+  var priceRuleY = priceY - priceSize / 72 - 0.12;
+
+  // Details: label column + wrapped value, shrunk if needed to fit above the price
+  var rows = liveCardRows(item);
+  var valueSize = 15, labelSize = 13, wrapped;
+  for (;;) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(valueSize);
+    wrapped = rows.map(function(row) { return clampLines(doc, doc.splitTextToSize(String(row[1]), width - labelW), 4, width - labelW); });
+    var needed = wrapped.reduce(function(sum, lines) { return sum + lines.length * lineH(valueSize) + 0.08; }, 0);
+    if (y + needed <= priceRuleY - 0.1 || valueSize <= 9) break;
+    valueSize -= 1;
+    labelSize = Math.min(13, valueSize);
+  }
+  rows.forEach(function(row, i) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(labelSize);
+    doc.text(row[0], left, y + valueSize / 72);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(valueSize);
+    doc.text(wrapped[i], left + labelW, y + valueSize / 72, { lineHeightFactor: 1.2 });
+    y += wrapped[i].length * lineH(valueSize) + 0.08;
+  });
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(priceSize);
+  doc.line(left, priceRuleY, left + width, priceRuleY);
+  doc.text(price, left, priceY);
+  if (item.condition) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.text('Condition', left, bottom);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(15);
+    doc.text(doc.splitTextToSize(item.condition, width - labelW)[0], left + labelW, bottom);
+  }
 }
 
 function togglePhotoGuide() {

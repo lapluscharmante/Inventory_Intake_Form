@@ -31,8 +31,11 @@ Anthropic API key from the [Claude Console](https://platform.claude.com/)
 
 ### 1. Create the site on Cloudflare Pages
 
-1. In the Cloudflare dashboard go to **Workers & Pages → Create → Pages →
-   Connect to Git**, and pick the `inventory_intake_form` repository.
+1. In the Cloudflare dashboard go to **Workers & Pages → Create**, choose the
+   **Pages** option (not the default Worker), then **Import an existing Git
+   repository** and pick the `inventory_intake_form` repository. A Worker
+   ignores the `functions/` folder, so the password and AI features wouldn't
+   run, and it can't take a custom domain whose DNS is outside Cloudflare.
 2. Build settings:
    - **Production branch:** `main`
    - **Framework preset:** None
@@ -62,17 +65,25 @@ Do these in this order, so the address doesn't briefly show an error:
 1. In the Pages project go to **Custom domains → Set up a custom domain**,
    enter `inventory.lapluscharmante.com` and continue. Cloudflare shows a
    CNAME target like `your-project.pages.dev`. Copy it.
-2. In **Shopify admin → Settings → Domains**, click `lapluscharmante.com`,
-   then **Domain settings → Edit DNS settings → Add custom record**:
+2. The domain's DNS is managed by **Squarespace**. Sign in at
+   [account.squarespace.com/domains](https://account.squarespace.com/domains),
+   click `lapluscharmante.com`, open **DNS**, and under **Custom records** add:
    - **Type:** CNAME
-   - **Name:** `inventory`
-   - **Points to:** the `….pages.dev` target from step 1
+   - **Host:** `inventory`
+   - **Data:** the `….pages.dev` target from step 1 (for this site,
+     `lpc-inventory.pages.dev`)
 3. Back in Cloudflare, wait for the domain to show **Active**. That's usually
    a few minutes, and can take up to a day.
 
-If the domain was bought somewhere else (GoDaddy, Namecheap, etc.) and only
-connected to Shopify, add the same CNAME record at that registrar instead. Your
-store, `www` and email are unaffected either way.
+Leave the other Squarespace DNS records alone. They connect the main domain
+to the Shopify store and email.
+
+## Updating it
+
+Merging a pull request into `main` starts a new Cloudflare build
+automatically. If no new entry appears under **Deployments**, commit any small
+change to `main` (e.g. edit this README on GitHub) to start one. **Retry
+deployment** only rebuilds the same older commit.
 
 ## Sharing it
 
@@ -109,6 +120,15 @@ access.
 - AI requests use the `claude-opus-5-5` model at low effort. Each description
   or invoice scan costs a fraction of a cent. If the AI is unavailable, the
   tool says why and falls back to a basic description.
+
+## IG Live Sale cards
+
+**↓ IG Live cards** in the queue downloads a PDF with one 4×6" card per queue
+item, sized for thermal mailing-label printers (Rollo, Zebra, MUNBYN, DYMO
+4XL…). Each card shows the title, SKU, length × width, stone, ring size (when
+there is one), weight, a large sale price and condition; empty fields are left
+off. Print at 100% / actual size. The PDF library loads from jsDelivr the first
+time, so it needs an internet connection.
 
 ## Running it locally (optional, for development)
 
