@@ -121,6 +121,15 @@ access.
   or invoice scan costs a fraction of a cent. If the AI is unavailable, the
   tool says why and falls back to a basic description.
 
+## IG Live Sale cards
+
+**↓ IG Live cards** in the queue downloads a PDF with one 4×6" card per queue
+item, sized for thermal mailing-label printers (Rollo, Zebra, MUNBYN, DYMO
+4XL…). Each card shows the title, SKU, length × width, stone, ring size (when
+there is one), weight, a large sale price and condition; empty fields are left
+off. Print at 100% / actual size. The PDF library loads from jsDelivr the first
+time, so it needs an internet connection.
+
 ## Running it locally (optional, for development)
 
 ```sh
