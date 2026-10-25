@@ -22,6 +22,7 @@ behind a shared password.
 | `functions/api/describe.js` | Writes listing descriptions with Claude |
 | `functions/api/scan-invoice.js` | Reads invoice photos with Claude |
 | `lib/claude.js` | Shared code for calling the Claude API |
+| `shopify-wishlist/` | Wishlist for the Shopify store's theme (separate from the intake tool; see its README) |
 
 ## One-time setup (about 15 minutes)
 

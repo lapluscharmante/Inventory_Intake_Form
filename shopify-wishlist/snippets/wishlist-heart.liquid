@@ -1,0 +1,18 @@
+{%- comment -%}
+  Optional. Product cards get a heart automatically; use this only to put a
+  heart somewhere else, or on a theme the automatic placement doesn't suit.
+
+    {% render 'wishlist-heart', product: card_product %}
+
+  Add class: 'card' to pin it to the top-right corner of a positioned image.
+{%- endcomment -%}
+{%- if product -%}
+  <button
+    type="button"
+    class="wl-heart wl-heart--{{ class | default: 'inline' }}"
+    data-wl-handle="{{ product.handle | escape }}"
+    data-wl-title="{{ product.title | escape }}"
+    aria-pressed="false"
+    aria-label="Save {{ product.title | escape }} to wishlist"
+  ></button>
+{%- endif -%}

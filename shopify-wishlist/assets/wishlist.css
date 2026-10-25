@@ -1,0 +1,863 @@
+/*
+ * Wishlist styles. Colours, fonts, corners and borders come from the theme's
+ * own settings (Dawn's CSS variables), so the wishlist follows any change made
+ * in the theme editor. Fallbacks keep it tidy on other themes.
+ *
+ * To give the hearts their own colour, set --wishlist-accent (see
+ * snippets/wishlist.liquid).
+ */
+
+.wl-heart,
+.wl-root,
+.wl-dialog,
+.wl-toast,
+.wl-header-link {
+  --wl-fg: rgb(var(--color-foreground, 18, 18, 18));
+  --wl-fg-soft: rgba(var(--color-foreground, 18, 18, 18), 0.65);
+  --wl-line: rgba(var(--color-foreground, 18, 18, 18), 0.15);
+  --wl-bg: rgb(var(--color-background, 255, 255, 255));
+  --wl-accent: var(--wishlist-accent, var(--wl-fg));
+  --wl-button: rgb(var(--color-button, 18, 18, 18));
+  --wl-button-text: rgb(var(--color-button-text, 255, 255, 255));
+  --wl-radius: var(--buttons-radius, 0px);
+  --wl-input-radius: var(--inputs-radius, 0px);
+  --wl-popup-radius: var(--popup-corner-radius, 0px);
+}
+
+.wl-visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  white-space: nowrap !important;
+}
+
+.wl-anchor {
+  position: relative;
+}
+
+/* ---- Hearts ---------------------------------------------------------- */
+
+/* :where() keeps these at zero specificity, so a theme button class wins */
+:where(.wl-heart) {
+  -webkit-appearance: none;
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6em;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--wl-fg);
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.wl-heart__icon {
+  width: 20px;
+  height: 20px;
+  fill: transparent;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  transition: fill 0.15s ease, transform 0.15s ease;
+}
+
+.wl-heart.wl-is-active .wl-heart__icon {
+  fill: var(--wl-accent);
+  stroke: var(--wl-accent);
+}
+
+.wl-heart:focus-visible {
+  outline: 2px solid rgba(var(--color-foreground, 18, 18, 18), 0.5);
+  outline-offset: 2px;
+}
+
+.wl-heart.wl-is-popping .wl-heart__icon {
+  animation: wl-pop 0.35s ease;
+}
+
+@keyframes wl-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+
+/* On product cards: a small round button in the image's top-right corner.
+   The 44px hit area is larger than the circle so it's easy to tap. */
+.wl-heart--card {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 3;
+  width: 44px;
+  height: 44px;
+}
+
+.wl-heart--card::before {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  background: var(--wl-bg);
+  opacity: 0.92;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  transition: transform 0.15s ease;
+}
+
+.wl-heart--card .wl-heart__icon {
+  position: relative;
+  width: 18px;
+  height: 18px;
+}
+
+@media (hover: hover) {
+  .wl-heart--card:hover::before {
+    transform: scale(1.08);
+  }
+}
+
+/* On the product page: a full-width button under "Add to cart". With Dawn
+   it also carries the theme's own button classes, which take over. */
+:where(.wl-heart--product) {
+  width: 100%;
+  min-height: calc(4.5rem + var(--buttons-border-width, 1px) * 2);
+  min-height: max(44px, calc(4.5rem + var(--buttons-border-width, 1px) * 2));
+  margin-top: 1rem;
+  padding: 0 1.5em;
+  border: var(--buttons-border-width, 1px) solid var(--wl-fg);
+  border-radius: var(--wl-radius);
+  letter-spacing: 0.06em;
+  font-size: 0.95em;
+}
+
+:where(.wl-heart--product):hover {
+  box-shadow: 0 0 0 1px var(--wl-fg);
+}
+
+.wl-heart--product {
+  gap: 0.6em;
+}
+
+.wl-heart__label::after {
+  content: attr(data-unsaved);
+}
+
+.wl-heart.wl-is-active .wl-heart__label::after {
+  content: attr(data-saved);
+}
+
+/* Optional heart for other spots, from snippets/wishlist-heart.liquid */
+.wl-heart--inline {
+  width: 44px;
+  height: 44px;
+}
+
+/* ---- Header icon ----------------------------------------------------- */
+
+.wl-header-link {
+  position: relative;
+  color: inherit;
+  text-decoration: none;
+}
+
+.wl-header-link__svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+.wl-count {
+  position: absolute;
+  bottom: 6px;
+  left: 24px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: var(--wl-button);
+  color: var(--wl-button-text);
+  font-size: 10px;
+  line-height: 17px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.wl-count[hidden] {
+  display: none;
+}
+
+.wl-header-link--floating {
+  position: fixed;
+  left: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--wl-bg);
+  color: var(--wl-fg);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+}
+
+.wl-header-link--floating .wl-count {
+  top: -2px;
+  right: -2px;
+  bottom: auto;
+  left: auto;
+}
+
+/* ---- Shared controls -------------------------------------------------- */
+
+:where(.wl-btn) {
+  -webkit-appearance: none;
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 1.5em;
+  border: 1px solid var(--wl-button);
+  border-radius: var(--wl-radius);
+  font: inherit;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+:where(.wl-btn--primary) {
+  background: var(--wl-button);
+  color: var(--wl-button-text);
+}
+
+:where(.wl-btn--secondary) {
+  background: transparent;
+  color: var(--wl-fg);
+}
+
+.wl-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.wl-btn.wl-is-busy {
+  cursor: progress;
+}
+
+.wl-icon-button {
+  -webkit-appearance: none;
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--wl-fg);
+  cursor: pointer;
+}
+
+.wl-icon-button svg,
+.wl-link-button svg,
+.wl-share__option svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.wl-link-button {
+  -webkit-appearance: none;
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  min-height: 44px;
+  padding: 0 0.25em;
+  border: 0;
+  background: none;
+  color: var(--wl-fg);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.3em;
+  text-decoration-thickness: 1px;
+  cursor: pointer;
+}
+
+.wl-link-button:hover {
+  text-decoration-thickness: 2px;
+}
+
+.wl-input,
+.wl-select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 0.9em;
+  border: var(--inputs-border-width, 1px) solid rgba(var(--color-foreground, 18, 18, 18), var(--inputs-border-opacity, 0.55));
+  border-radius: var(--wl-input-radius);
+  background: var(--wl-bg);
+  color: var(--wl-fg);
+  /* 16px stops iPhones zooming in when the field is tapped */
+  font: inherit;
+  font-size: max(16px, 1em);
+}
+
+.wl-select {
+  -webkit-appearance: none;
+  appearance: none;
+  padding-right: 2.2em;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 17px) 50%, calc(100% - 12px) 50%;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+  text-overflow: ellipsis;
+}
+
+.wl-select--quiet {
+  border-color: transparent;
+  padding-left: 0;
+  color: var(--wl-fg-soft);
+  font-size: max(16px, 0.9em);
+}
+
+/* ---- Toast ------------------------------------------------------------ */
+
+.wl-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 1.25em;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 12px 18px;
+  border-radius: var(--wl-popup-radius);
+  background: var(--wl-fg);
+  color: var(--wl-bg);
+  font-family: var(--font-body-family, inherit);
+  font-size: 15px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 16px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.wl-toast.wl-is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, 0);
+}
+
+.wl-toast__action {
+  flex: none;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.25em;
+  cursor: pointer;
+}
+
+/* ---- Dialogs (a centred box on desktop, a bottom sheet on phones) ---- */
+
+html.wl-dialog-open {
+  overflow: hidden;
+}
+
+.wl-dialog {
+  box-sizing: border-box;
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  margin: auto;
+  padding: 0;
+  border: var(--popup-border-width, 1px) solid var(--wl-line);
+  border-radius: var(--wl-popup-radius);
+  background: var(--wl-bg);
+  color: var(--wl-fg);
+  font-family: var(--font-body-family, inherit);
+  font-size: 15px;
+  line-height: 1.5;
+  letter-spacing: 0.04em;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.18);
+}
+
+.wl-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.wl-dialog:not([open]) {
+  display: none;
+}
+
+.wl-dialog__panel {
+  padding: 8px 24px 24px;
+}
+
+.wl-dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-right: -12px;
+}
+
+.wl-dialog__title {
+  margin: 12px 0;
+  font-family: var(--font-heading-family, inherit);
+  font-size: 20px;
+  font-weight: var(--font-heading-weight, 400);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.wl-dialog__subtitle {
+  margin: -4px 0 12px;
+  color: var(--wl-fg-soft);
+}
+
+.wl-dialog__actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.wl-dialog__actions > * {
+  flex: 1;
+  min-width: 0;
+}
+
+.wl-form {
+  margin: 4px 0 0;
+}
+
+.wl-picker {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--wl-line);
+}
+
+.wl-picker__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  border-bottom: 1px solid var(--wl-line);
+  cursor: pointer;
+}
+
+.wl-checkbox {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--wl-button);
+}
+
+.wl-picker__name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.wl-picker__count {
+  color: var(--wl-fg-soft);
+  font-size: 0.9em;
+}
+
+.wl-picker__new {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.wl-picker__new .wl-btn {
+  flex: none;
+}
+
+.wl-share {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+  gap: 8px;
+  margin: 4px 0 16px;
+}
+
+.wl-share__option {
+  -webkit-appearance: none;
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 4px;
+  border: 1px solid var(--wl-line);
+  border-radius: var(--wl-radius);
+  background: none;
+  color: var(--wl-fg);
+  font: inherit;
+  font-size: 13px;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.wl-share__option:hover {
+  border-color: var(--wl-fg);
+}
+
+.wl-share__option svg {
+  width: 22px;
+  height: 22px;
+}
+
+.wl-share__url {
+  color: var(--wl-fg-soft);
+  font-size: 14px;
+}
+
+@media (max-width: 749px) {
+  .wl-dialog {
+    width: 100%;
+    max-width: none;
+    max-height: 85vh;
+    margin: auto 0 0;
+    border-width: 0;
+    border-radius: 12px 12px 0 0;
+    animation: wl-sheet 0.22s ease;
+  }
+
+  .wl-dialog__panel {
+    padding: 8px 16px calc(20px + env(safe-area-inset-bottom));
+  }
+}
+
+@keyframes wl-sheet {
+  from { transform: translateY(40px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+/* ---- Wishlist page ---------------------------------------------------- */
+
+.wl-page {
+  padding: 0 0 48px;
+}
+
+.wl-page__title {
+  margin: 0 0 24px;
+  overflow-wrap: anywhere;
+}
+
+.wl-eyebrow {
+  margin: 0 0 4px;
+  color: var(--wl-fg-soft);
+  font-size: 0.85em;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.wl-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 0 0 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.wl-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.wl-tab {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 70vw;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--wl-line);
+  border-radius: var(--variant-pills-radius, 40px);
+  background: var(--wl-bg);
+  color: var(--wl-fg);
+  font: inherit;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.wl-tab__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wl-tab__count {
+  color: var(--wl-fg-soft);
+  font-size: 0.85em;
+}
+
+.wl-tab[aria-selected='true'] {
+  border-color: var(--wl-button);
+  background: var(--wl-button);
+  color: var(--wl-button-text);
+}
+
+.wl-tab[aria-selected='true'] .wl-tab__count {
+  color: inherit;
+  opacity: 0.75;
+}
+
+.wl-tab--new {
+  border-style: dashed;
+}
+
+.wl-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 24px;
+  margin: 8px 0 20px;
+  padding: 0 0 12px;
+  border-bottom: 1px solid var(--wl-line);
+}
+
+.wl-bar__name {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.wl-bar__count {
+  margin: 0;
+  color: var(--wl-fg-soft);
+}
+
+.wl-bar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 16px;
+  margin-left: -0.25em;
+}
+
+.wl-link-button__heart {
+  fill: none;
+}
+
+.wl-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 32px var(--grid-desktop-horizontal-spacing, 16px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (max-width: 749px) {
+  .wl-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px var(--grid-mobile-horizontal-spacing, 8px);
+  }
+
+  .wl-bar__actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+.wl-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.wl-item__media {
+  display: block;
+  position: relative;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border: var(--media-border-width, 1px) solid rgba(var(--color-foreground, 18, 18, 18), var(--media-border-opacity, 0.05));
+  border-radius: var(--media-radius, 0px);
+  background: rgba(var(--color-foreground, 18, 18, 18), 0.04);
+}
+
+.wl-item__media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.wl-item__remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
+}
+
+.wl-item__remove::before {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  border-radius: 50%;
+  background: var(--wl-bg);
+  opacity: 0.92;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+.wl-item__remove svg {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.wl-item__info {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+}
+
+.wl-item__title {
+  margin: 0;
+  color: var(--wl-fg);
+  font-size: 1.05em;
+  line-height: 1.35;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.wl-item__title:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.3em;
+}
+
+.wl-item__price {
+  margin: 0;
+}
+
+.wl-item__compare {
+  margin-right: 0.4em;
+  color: var(--wl-fg-soft);
+}
+
+.wl-item__note {
+  margin: 0;
+  color: var(--wl-fg-soft);
+}
+
+.wl-item__variant {
+  display: block;
+}
+
+.wl-item__buy {
+  width: 100%;
+  min-width: 0;
+  margin-top: auto;
+}
+
+.wl-item--gone .wl-item__media {
+  opacity: 0.5;
+}
+
+@media (max-width: 749px) {
+  .wl-item__buy {
+    padding-left: 0.5em;
+    padding-right: 0.5em;
+  }
+}
+
+.wl-skeleton {
+  display: block;
+  height: 14px;
+  width: 80%;
+  background: rgba(var(--color-foreground, 18, 18, 18), 0.07);
+  animation: wl-pulse 1.2s ease-in-out infinite;
+}
+
+.wl-skeleton--short {
+  width: 40%;
+}
+
+@keyframes wl-pulse {
+  50% { opacity: 0.5; }
+}
+
+.wl-footer {
+  display: flex;
+  justify-content: center;
+  margin-top: 40px;
+}
+
+.wl-buy-all {
+  min-width: min(320px, 100%);
+}
+
+.wl-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 48px 16px;
+  text-align: center;
+}
+
+.wl-empty__icon {
+  width: 40px;
+  height: 40px;
+  fill: none;
+  stroke: var(--wl-fg-soft);
+  stroke-width: 1.2;
+}
+
+.wl-empty__title {
+  margin: 16px 0 4px;
+  font-size: 1.2em;
+}
+
+.wl-empty__body {
+  margin: 0 0 24px;
+  color: var(--wl-fg-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wl-heart *,
+  .wl-heart::before,
+  .wl-toast,
+  .wl-dialog,
+  .wl-skeleton {
+    animation: none !important;
+    transition: none !important;
+  }
+}

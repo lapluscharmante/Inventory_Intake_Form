@@ -1,0 +1,42 @@
+{%- comment -%}
+  Loads the wishlist on every page. Add this line to layout/theme.liquid,
+  just above </body>:
+
+    {% render 'wishlist' %}
+
+  Optional settings (all can be left out):
+    accent_color   Colour of a filled heart, e.g. '#99793a'. Defaults to the
+                   theme's text colour.
+    header_icon    false to skip the heart icon next to the cart icon.
+    page_handle    Handle of the wishlist page. Defaults to 'wishlist'.
+
+  Example: {% render 'wishlist', accent_color: '#99793a' %}
+{%- endcomment -%}
+
+{{ 'wishlist.css' | asset_url | stylesheet_tag }}
+
+{%- if accent_color != blank -%}
+  <style>
+    :root { --wishlist-accent: {{ accent_color }}; }
+  </style>
+{%- endif -%}
+
+<script>
+  window.WishlistConfig = Object.assign({
+    shopName: {{ shop.name | json }},
+    currency: {{ cart.currency.iso_code | json }},
+    pageHandle: {{ page_handle | default: 'wishlist' | json }},
+    headerIcon: {% if header_icon == false %}false{% else %}true{% endif %},
+    continueUrl: {{ routes.all_products_collection_url | json }},
+    // Dawn's button classes, so wishlist buttons look like the rest of the store
+    buttonClass: 'button',
+    secondaryButtonClass: 'button button--secondary',
+    productButtonClass: 'button button--secondary button--full-width',
+    product: {%- if request.page_type == 'product' and product -%}
+      { handle: {{ product.handle | json }}, title: {{ product.title | json }} }
+    {%- else -%}
+      null
+    {%- endif -%}
+  }, window.WishlistConfig || {});
+</script>
+<script src="{{ 'wishlist.js' | asset_url }}" defer></script>
