@@ -60,19 +60,18 @@ and paste in the contents from this folder:
 | `snippets` | `wishlist.liquid` |
 | `snippets` | `wishlist-heart.liquid` (optional) |
 | `sections` | `wishlist-page.liquid` |
+| `sections` | `wishlist-loader.liquid` |
 | `templates` | `page.wishlist.json` |
 
-### 3. Load it on every page
+### 3. Turn it on across the store
 
-Open `layout/theme.liquid`, find `</body>` near the bottom, and paste this on
-the line just above it:
+On the copy, click **Customize**. In the left sidebar, under **Footer**,
+click **Add section** and choose **Wishlist**. Save. The section shows
+nothing itself; it switches the hearts on everywhere. Its settings set the
+filled heart colour (e.g. gold `#99793a`) and the header icon.
 
-```liquid
-{% render 'wishlist' %}
-```
-
-To make filled hearts gold instead of black, use
-`{% render 'wishlist', accent_color: '#99793a' %}`.
+If you'd rather not use a section, paste `{% render 'wishlist' %}` just above
+`</body>` in `layout/theme.liquid` instead.
 
 ### 4. Create the wishlist page
 
@@ -98,9 +97,8 @@ right, **Publish** the copy.
 
 - **Page heading and spacing:** **Customize**, open the Wishlist page, and
   click the **Wishlist** section.
-- **Heart colour:** the `accent_color` option in step 3.
-- **No header icon:** `{% render 'wishlist', header_icon: false %}`. Add a
-  menu link to `/pages/wishlist` instead.
+- **Heart colour and header icon:** the **Wishlist** section in the footer
+  (step 3). Without a header icon, add a menu link to `/pages/wishlist`.
 - **Wording:** everything customers read is in the `TEXT` list at the top of
   `wishlist.js`. It can also be overridden without editing that file, e.g.
   add `strings: { buyNow: 'Buy it now' }` to `window.WishlistConfig` in
@@ -120,5 +118,6 @@ right, **Publish** the copy.
 | `assets/wishlist.css` | Styles, built on Dawn's theme settings |
 | `snippets/wishlist.liquid` | Loads the above and passes in shop settings |
 | `snippets/wishlist-heart.liquid` | Optional heart for placing by hand |
+| `sections/wishlist-loader.liquid` | Turns the wishlist on store-wide from the footer group (editable in Customize) |
 | `sections/wishlist-page.liquid` | The wishlist page section (editable in Customize) |
 | `templates/page.wishlist.json` | Page template that uses that section |

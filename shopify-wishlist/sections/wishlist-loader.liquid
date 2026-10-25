@@ -1,0 +1,40 @@
+{%- comment -%}
+  Turns the wishlist on across the store. It lives in the footer group, so it
+  can be added, adjusted or removed in Customize without editing theme code.
+  It shows nothing itself; it loads snippets/wishlist.liquid.
+{%- endcomment -%}
+{%- render 'wishlist', accent_color: section.settings.accent_color, header_icon: section.settings.header_icon -%}
+
+{% schema %}
+{
+  "name": "Wishlist",
+  "tag": "div",
+  "class": "wishlist-loader",
+  "enabled_on": {
+    "groups": ["footer"]
+  },
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "Adds wishlist hearts to product cards and product pages. Remove this section to turn the wishlist off."
+    },
+    {
+      "type": "color",
+      "id": "accent_color",
+      "label": "Filled heart color",
+      "info": "Leave empty to use the text color."
+    },
+    {
+      "type": "checkbox",
+      "id": "header_icon",
+      "label": "Show heart icon next to the cart",
+      "default": true
+    }
+  ],
+  "presets": [
+    {
+      "name": "Wishlist"
+    }
+  ]
+}
+{% endschema %}
