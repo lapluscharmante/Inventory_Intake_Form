@@ -130,6 +130,21 @@ there is one), weight, a large sale price and condition; empty fields are left
 off. Print at 100% / actual size. The PDF library loads from jsDelivr the first
 time, so it needs an internet connection.
 
+## Shopify product tags
+
+The **Shopify tags** tab prints fold tags for products already listed in your
+store. Export your products from Shopify admin (**Products → Export → CSV for
+Excel, Numbers, or other spreadsheet programs**), choose that file in the tab,
+tick the products you want and set how many tags each, then **⬡ Print tags**.
+
+Each 2.36" × 0.47" fold tag has the title, price and SKU on one half and a QR
+code on the other that opens the product's page
+(`https://lapluscharmante.com/products/<handle>`; the store address can be
+changed in the tab). Each variant of a product gets its own row. Draft and
+archived products are hidden unless **Active only** is unticked. The QR code
+library loads from jsDelivr the first time, so it needs an internet
+connection. Scan one printed tag before printing a big batch.
+
 ## Running it locally (optional, for development)
 
 ```sh
