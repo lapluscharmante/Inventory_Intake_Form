@@ -132,18 +132,25 @@ time, so it needs an internet connection.
 
 ## Shopify product tags
 
-The **Shopify tags** tab prints fold tags for products already listed in your
-store. Export your products from Shopify admin (**Products → Export → CSV for
-Excel, Numbers, or other spreadsheet programs**), choose that file in the tab,
-tick the products you want and set how many tags each, then **⬡ Print tags**.
+The **Shopify tags** tab prints product labels on **Avery Presta 94749**
+barbell jewelry labels (½" × 2½", 45 per Letter sheet, 3 across × 15 down)
+for products already listed in your store. Export your products from Shopify
+admin (**Products → Export → CSV for Excel, Numbers, or other spreadsheet
+programs**), choose that file in the tab, tick the products you want and set
+how many labels each, then **⬡ Print labels**.
 
-Each 2.36" × 0.47" fold tag has the title, price and SKU on one half and a QR
-code on the other that opens the product's page
+Each label has the title, price, variant (e.g. size) and SKU on the left end
+and a QR code on the right end that opens the product's page
 (`https://lapluscharmante.com/products/<handle>`; the store address can be
-changed in the tab). Each variant of a product gets its own row. Draft and
-archived products are hidden unless **Active only** is unticked. The QR code
-library loads from jsDelivr the first time, so it needs an internet
-connection. Scan one printed tag before printing a big batch.
+changed in the tab). Draft and archived products are hidden unless **Active
+only** is unticked. **Start at label #** skips labels already used on a partly
+used sheet.
+
+Print with scale **100% / Actual size** and margins **None**. Under **Printer
+alignment**, **Print alignment test** prints the label outlines on plain paper
+so you can check them against a label sheet; if they're off, nudge them by a
+few millimetres there (remembered per browser). The QR code library loads
+from jsDelivr the first time, so it needs an internet connection.
 
 ## Running it locally (optional, for development)
 
