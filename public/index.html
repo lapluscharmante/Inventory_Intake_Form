@@ -152,6 +152,23 @@
   .photo-shot { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
   .photo-shot code { font-family: 'Courier New', monospace; font-size: 11px; background: var(--surface); border: 1px solid var(--border); padding: 2px 7px; border-radius: 4px; color: var(--text); white-space: nowrap; }
 
+  .tabs { display: flex; gap: 4px; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border); }
+  .tab { border: 1px solid transparent; border-bottom: none; border-radius: var(--radius) var(--radius) 0 0; background: transparent; color: var(--text-muted); padding: 8px 16px; font-size: 14px; margin-bottom: -1px; }
+  .tab:hover { background: var(--surface); }
+  .tab.active { background: var(--surface); border-color: var(--border); color: var(--text); }
+
+  .product-tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+  .product-tools input[type=search] { flex: 1; min-width: 180px; }
+  .product-list { max-height: 60vh; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+  .product-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--border); cursor: pointer; }
+  .product-row:last-child { border-bottom: none; }
+  .product-row.selected { background: var(--accent-bg); }
+  .product-row input[type=checkbox] { width: auto; flex-shrink: 0; }
+  .product-row .item-info { cursor: pointer; }
+  .product-row .copies { width: 64px; flex-shrink: 0; padding: 4px 6px; font-size: 13px; }
+  .status-badge { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--border-strong); color: var(--text-muted); margin-left: 6px; vertical-align: middle; }
+  .print-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+
   @media (max-width: 600px) {
     .col-2, .col-3, .col-4 { grid-template-columns: 1fr; }
     main { padding: 1rem; }
@@ -181,6 +198,13 @@
 </header>
 
 <main>
+
+<nav class="tabs" role="tablist">
+  <button class="tab active" id="tab-btn-intake" role="tab" onclick="showTab('intake')">Intake</button>
+  <button class="tab" id="tab-btn-shopify" role="tab" onclick="showTab('shopify')">Shopify tags</button>
+</nav>
+
+<div id="tab-intake">
 
 <section>
   <h2>Invoice scan <span style="font-size:11px; font-weight:normal; letter-spacing:0; text-transform:none; color:var(--text-subtle);">optional — adds every item on the invoice to the queue, translated to English</span></h2>
@@ -331,6 +355,66 @@
     <div id="photo-list"></div>
   </div>
 </section>
+
+</div>
+
+<div id="tab-shopify" style="display:none;">
+
+<section>
+  <h2>Shopify product tags <span style="font-size:11px; font-weight:normal; letter-spacing:0; text-transform:none; color:var(--text-subtle);">Avery Presta 94749 barbell labels — title, price &amp; SKU on one end, QR code to the product page on the other</span></h2>
+
+  <div class="row col-2">
+    <div>
+      <label>Products CSV from Shopify</label>
+      <label style="margin:0; cursor:pointer; display:inline-block;">
+        <span style="font-size:13px; padding:7px 14px; border:1px solid var(--border-strong); border-radius:var(--radius); background:var(--bg); color:var(--text); display:inline-block; cursor:pointer;">📄 Choose CSV file</span>
+        <input type="file" id="shopify-csv" accept=".csv,text/csv" style="display:none;" onchange="handleShopifyCsv(event)" />
+      </label>
+      <span id="shopify-csv-name" style="font-size:12px; color:var(--text-subtle); margin-left:6px;"></span>
+    </div>
+    <div>
+      <label>Your store's web address <span style="font-size:11px; color:var(--text-subtle);">(QR codes link to …/products/&lt;handle&gt;)</span></label>
+      <input id="store-url" type="url" placeholder="https://lapluscharmante.com" oninput="saveStoreUrl()" />
+    </div>
+  </div>
+  <p style="font-size:12px; color:var(--text-subtle); margin-bottom:12px;">In Shopify admin go to <strong>Products → Export</strong>, choose <strong>All products</strong> (or the ones you want) and <strong>CSV for Excel, Numbers, or other spreadsheet programs</strong>. Shopify emails you the file.</p>
+  <div id="shopify-error" class="error-msg"></div>
+
+  <div id="shopify-products" style="display:none;">
+    <div class="product-tools">
+      <input type="search" id="product-search" placeholder="Search title or SKU…" oninput="renderProductList()" />
+      <label style="margin:0; display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--text-muted);">
+        <input type="checkbox" id="active-only" checked onchange="renderProductList()" style="width:auto;" /> Active only
+      </label>
+      <button class="sm" onclick="selectShownProducts(true)">Select shown</button>
+      <button class="sm" onclick="selectShownProducts(false)">Clear shown</button>
+    </div>
+    <div style="font-size:12px; color:var(--text-subtle); margin-bottom:6px;" id="product-count"></div>
+    <div class="product-list" id="product-list"></div>
+    <div class="print-bar">
+      <span id="selected-count" style="font-size:13px; color:var(--text-muted);"></span>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <label style="margin:0; display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--text-muted);" title="Skip labels already used on a partly used sheet">
+          Start at label #
+          <input id="start-label" type="number" min="1" max="45" value="1" style="width:64px; padding:4px 6px; font-size:13px;" />
+        </label>
+        <button class="primary" id="print-shopify-btn" onclick="printShopifyTags()" disabled>⬡ Print labels</button>
+      </div>
+    </div>
+  </div>
+
+  <details style="margin-top:14px; font-size:13px; color:var(--text-muted);">
+    <summary style="cursor:pointer;">Printer alignment</summary>
+    <p style="margin:8px 0;">Labels are laid out for <strong>Avery Presta 94749</strong> (45 per Letter sheet, 3 across × 15 down). Print with scale set to <strong>100% / Actual size</strong> and margins set to <strong>None</strong>. Print the alignment test on plain paper and hold it over a label sheet against a window; if the outlines are off, nudge them here and test again.</p>
+    <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+      <label style="margin:0; display:inline-flex; align-items:center; gap:6px;">Move right (mm) <input id="nudge-x" type="number" step="0.5" value="0" oninput="saveNudge()" style="width:72px; padding:4px 6px; font-size:13px;" /></label>
+      <label style="margin:0; display:inline-flex; align-items:center; gap:6px;">Move down (mm) <input id="nudge-y" type="number" step="0.5" value="0" oninput="saveNudge()" style="width:72px; padding:4px 6px; font-size:13px;" /></label>
+      <button class="sm" onclick="printAlignmentTest()">Print alignment test</button>
+    </div>
+  </details>
+</section>
+
+</div>
 
 </main>
 
@@ -1404,6 +1488,338 @@ function setSelect(id, val) {
     }
   }
 }
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+var TAB_KEY = 'jewelry_inventory_tab';
+
+function showTab(name) {
+  ['intake', 'shopify'].forEach(function(t) {
+    document.getElementById('tab-' + t).style.display = t === name ? 'block' : 'none';
+    document.getElementById('tab-btn-' + t).classList.toggle('active', t === name);
+  });
+  try { localStorage.setItem(TAB_KEY, name); } catch(e) {}
+}
+
+window.addEventListener('load', function() {
+  var tab = null;
+  try { tab = localStorage.getItem(TAB_KEY); } catch(e) {}
+  if (tab === 'shopify') showTab('shopify');
+  try { document.getElementById('store-url').value = localStorage.getItem(STORE_URL_KEY) || DEFAULT_STORE_URL; } catch(e) {
+    document.getElementById('store-url').value = DEFAULT_STORE_URL;
+  }
+});
+
+// ── Shopify product tags ──────────────────────────────────────────────────────
+// Reads a products CSV exported from Shopify (old "Handle / Variant SKU" or new
+// "URL handle / SKU" column names), lists each variant, and prints fold tags:
+// title, price and SKU on one half, a QR code to the product page on the other.
+var QR_LIB_URL = 'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js';
+var STORE_URL_KEY = 'jewelry_inventory_store_url';
+var DEFAULT_STORE_URL = 'https://lapluscharmante.com';
+var shopifyProducts = [];
+
+function saveStoreUrl() {
+  try { localStorage.setItem(STORE_URL_KEY, v('store-url')); } catch(e) {}
+}
+
+function storeBaseUrl() {
+  var url = v('store-url') || DEFAULT_STORE_URL;
+  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+  return url.replace(/\/+$/, '');
+}
+
+// RFC 4180 CSV: quoted fields may contain commas, quotes ("") and line breaks
+function parseCsv(text) {
+  var rows = [], row = [], field = '', inQuotes = false;
+  text = text.replace(/^﻿/, '');
+  for (var i = 0; i < text.length; i++) {
+    var ch = text[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; }
+        else inQuotes = false;
+      } else field += ch;
+    } else if (ch === '"') inQuotes = true;
+    else if (ch === ',') { row.push(field); field = ''; }
+    else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && text[i + 1] === '\n') i++;
+      row.push(field); rows.push(row); row = []; field = '';
+    } else field += ch;
+  }
+  if (field || row.length) { row.push(field); rows.push(row); }
+  return rows.filter(function(r) { return r.some(function(f) { return f.trim(); }); });
+}
+
+function productsFromCsv(text) {
+  var rows = parseCsv(text);
+  if (rows.length < 2) throw new Error('The file has no product rows.');
+  var header = rows[0].map(function(h) { return h.trim().toLowerCase(); });
+  var col = function(names) {
+    for (var i = 0; i < names.length; i++) { var idx = header.indexOf(names[i]); if (idx >= 0) return idx; }
+    return -1;
+  };
+  var c = {
+    handle: col(['handle', 'url handle']),
+    title: col(['title']),
+    sku: col(['variant sku', 'sku']),
+    price: col(['variant price', 'price']),
+    status: col(['status']),
+    options: [1, 2, 3].map(function(n) { return col(['option' + n + ' value']); })
+  };
+  if (c.handle < 0 || c.title < 0) {
+    throw new Error('This doesn\'t look like a Shopify products export (no Handle or Title column).');
+  }
+  var products = [], current = null;
+  rows.slice(1).forEach(function(r) {
+    var get = function(idx) { return idx >= 0 && r[idx] !== undefined ? r[idx].trim() : ''; };
+    var handle = get(c.handle);
+    if (!handle) return;
+    // Shopify only fills title and status on a product's first row; later rows are more variants or extra images
+    if (!current || current.handle !== handle) current = { handle: handle, title: get(c.title), status: get(c.status) };
+    var sku = get(c.sku), price = get(c.price);
+    var options = c.options.map(get).filter(function(o) { return o && o !== 'Default Title'; });
+    if (!sku && !price && !options.length) return;
+    products.push({
+      handle: handle,
+      title: current.title || handle,
+      variant: options.join(' / '),
+      sku: sku,
+      price: price,
+      status: (current.status || 'active').toLowerCase(),
+      selected: false,
+      copies: 1
+    });
+  });
+  if (!products.length) throw new Error('No products with a price or SKU were found in the file.');
+  return products;
+}
+
+function handleShopifyCsv(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  var errorEl = document.getElementById('shopify-error');
+  errorEl.style.display = 'none';
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      shopifyProducts = productsFromCsv(e.target.result);
+      document.getElementById('shopify-csv-name').textContent = file.name;
+      document.getElementById('product-search').value = '';
+      document.getElementById('shopify-products').style.display = 'block';
+      renderProductList();
+    } catch(err) {
+      errorEl.textContent = err.message;
+      errorEl.style.display = 'block';
+    }
+    event.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
+function shownProducts() {
+  var q = v('product-search').toLowerCase();
+  var activeOnly = document.getElementById('active-only').checked;
+  return shopifyProducts.filter(function(p) {
+    if (activeOnly && p.status !== 'active') return false;
+    return !q || (p.title + ' ' + p.variant + ' ' + p.sku).toLowerCase().indexOf(q) >= 0;
+  });
+}
+
+function renderProductList() {
+  var shown = shownProducts();
+  document.getElementById('product-count').textContent = 'Showing ' + shown.length + ' of ' + shopifyProducts.length + ' product' + (shopifyProducts.length !== 1 ? 's' : '') + ' — tap a row to select it.';
+  document.getElementById('product-list').innerHTML = shown.length ? shown.map(function(p) {
+    var i = shopifyProducts.indexOf(p);
+    var meta = [p.sku || 'no SKU', p.price ? '$' + formatPrice(p.price) : 'no price'].join(' · ');
+    return '<div class="product-row' + (p.selected ? ' selected' : '') + '" onclick="toggleProduct(' + i + ', event)">'
+      + '<input type="checkbox"' + (p.selected ? ' checked' : '') + ' tabindex="-1" />'
+      + '<div class="item-info">'
+      + '<div class="item-title">' + escapeHtml(p.title) + (p.variant ? ' — ' + escapeHtml(p.variant) : '')
+      + (p.status !== 'active' ? '<span class="status-badge">' + escapeHtml(p.status) + '</span>' : '') + '</div>'
+      + '<div class="item-meta">' + escapeHtml(meta) + '</div>'
+      + '</div>'
+      + '<input class="copies" type="number" min="1" max="99" value="' + p.copies + '" title="Number of tags" aria-label="Number of tags" onclick="event.stopPropagation()" onchange="setCopies(' + i + ', this.value)" />'
+      + '</div>';
+  }).join('') : '<p style="padding:12px; font-size:13px; color:var(--text-muted);">No products match.</p>';
+  updateSelectedCount();
+}
+
+function toggleProduct(i, event) {
+  shopifyProducts[i].selected = !shopifyProducts[i].selected;
+  var row = event.currentTarget;
+  row.classList.toggle('selected', shopifyProducts[i].selected);
+  row.querySelector('input[type=checkbox]').checked = shopifyProducts[i].selected;
+  updateSelectedCount();
+}
+
+function setCopies(i, value) {
+  shopifyProducts[i].copies = Math.max(1, Math.min(99, parseInt(value, 10) || 1));
+  updateSelectedCount();
+}
+
+function selectShownProducts(selected) {
+  shownProducts().forEach(function(p) { p.selected = selected; });
+  renderProductList();
+}
+
+function updateSelectedCount() {
+  var chosen = shopifyProducts.filter(function(p) { return p.selected; });
+  var tags = chosen.reduce(function(sum, p) { return sum + p.copies; }, 0);
+  document.getElementById('selected-count').textContent = chosen.length
+    ? chosen.length + ' product' + (chosen.length !== 1 ? 's' : '') + ' selected — ' + tags + ' tag' + (tags !== 1 ? 's' : '')
+    : 'No products selected';
+  document.getElementById('print-shopify-btn').disabled = !chosen.length;
+}
+
+function loadQrLib() {
+  if (window.qrcode) return Promise.resolve(window.qrcode);
+  return new Promise(function(resolve, reject) {
+    var script = document.createElement('script');
+    script.src = QR_LIB_URL;
+    script.onload = function() { window.qrcode ? resolve(window.qrcode) : reject(new Error('QR code library failed to load')); };
+    script.onerror = function() { reject(new Error('Could not load the QR code library — check your internet connection')); };
+    document.head.appendChild(script);
+  });
+}
+
+// Square SVG QR code; one path, crisp module edges for thermal printing
+function qrSvg(qrcode, text, sizeIn) {
+  var qr = qrcode(0, 'L');
+  qr.addData(text);
+  qr.make();
+  var n = qr.getModuleCount(), quiet = 2, d = '';
+  for (var r = 0; r < n; r++) {
+    for (var col = 0; col < n; col++) {
+      if (qr.isDark(r, col)) d += 'M' + (col + quiet) + ' ' + (r + quiet) + 'h1v1h-1z';
+    }
+  }
+  var total = n + quiet * 2;
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="' + sizeIn + 'in" height="' + sizeIn + 'in" viewBox="0 0 ' + total + ' ' + total + '" shape-rendering="crispEdges">'
+    + '<rect width="' + total + '" height="' + total + '" fill="#fff"/><path d="' + d + '" fill="#000"/></svg>';
+}
+
+// Avery Presta 94749 geometry, measured from Avery's template PDF (inches):
+// Letter sheet, 3 × 15 labels of 2.5" × 0.5". Each barbell label has a 0.92"
+// printable end on each side joined by a narrow 0.66" bar.
+var AVERY_94749 = {
+  cols: 3, rows: 15,
+  left: 0.25, top: 0.65625,
+  colPitch: 2.75, rowPitch: 0.65625,
+  width: 2.5, height: 0.5,
+  padWidth: 0.92
+};
+var NUDGE_KEY = 'jewelry_inventory_label_nudge';
+
+window.addEventListener('load', function() {
+  try {
+    var n = JSON.parse(localStorage.getItem(NUDGE_KEY)) || {};
+    document.getElementById('nudge-x').value = n.x || 0;
+    document.getElementById('nudge-y').value = n.y || 0;
+  } catch(e) {}
+});
+
+function saveNudge() {
+  try { localStorage.setItem(NUDGE_KEY, JSON.stringify({ x: parseFloat(v('nudge-x')) || 0, y: parseFloat(v('nudge-y')) || 0 })); } catch(e) {}
+}
+
+function nudgeInches() {
+  return { x: (parseFloat(v('nudge-x')) || 0) / 25.4, y: (parseFloat(v('nudge-y')) || 0) / 25.4 };
+}
+
+async function printShopifyTags() {
+  var chosen = shopifyProducts.filter(function(p) { return p.selected; });
+  if (!chosen.length) return;
+  // Open the window right away (inside the tap) so iPad Safari doesn't block it as a pop-up
+  var w = window.open('', '_blank', 'width=900,height=700');
+  if (!w) { alert('Allow pop-ups for this site to print labels.'); return; }
+  w.document.write('<p style="font-family:Arial,sans-serif;">Making labels…</p>');
+  try {
+    var qrcode = await loadQrLib();
+    var base = storeBaseUrl();
+    var start = Math.max(1, Math.min(45, parseInt(v('start-label'), 10) || 1));
+    var cells = [];
+    for (var i = 1; i < start; i++) cells.push(null);
+    chosen.forEach(function(p) {
+      var qr = qrSvg(qrcode, base + '/products/' + encodeURIComponent(p.handle), 0.44);
+      for (var c = 0; c < p.copies; c++) cells.push(averyLabelHtml(p, qr));
+    });
+    var labels = cells.filter(Boolean).length;
+    var sheets = Math.ceil(cells.length / (AVERY_94749.cols * AVERY_94749.rows));
+    var note = labels + ' label' + (labels !== 1 ? 's' : '') + ' on ' + sheets + ' sheet' + (sheets !== 1 ? 's' : '')
+      + (start > 1 ? ', starting at label #' + start : '') + '. QR codes link to ' + escapeHtml(base) + '/products/…';
+    w.document.open();
+    w.document.write(averySheetsHtml('Shopify Product Labels', cells, note, false));
+    w.document.close();
+  } catch(e) {
+    w.close();
+    alert('Couldn\'t make the labels: ' + e.message);
+  }
+}
+
+function printAlignmentTest() {
+  var w = window.open('', '_blank', 'width=900,height=700');
+  if (!w) { alert('Allow pop-ups for this site to print the test.'); return; }
+  var cells = [];
+  for (var i = 1; i <= AVERY_94749.cols * AVERY_94749.rows; i++) {
+    cells.push('<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:bold 9px Arial,sans-serif;">#' + i + '</div>');
+  }
+  w.document.write(averySheetsHtml('Label Alignment Test', cells, 'Print on plain paper and hold over a label sheet against a window.', true));
+  w.document.close();
+}
+
+// Title, price and SKU on the left end; QR code on the right end
+function averyLabelHtml(p, qr) {
+  var g = AVERY_94749, inset = 0.04;
+  // The variant goes beside the price so a long title can't push it out of view
+  return '<div style="position:absolute;left:' + inset + 'in;top:' + inset + 'in;width:' + (g.padWidth - 2 * inset) + 'in;height:' + (g.height - 2 * inset) + 'in;display:flex;flex-direction:column;justify-content:center;overflow:hidden;font-family:Arial,sans-serif;color:#000;line-height:1.1;">'
+      + '<div style="font-size:6.5pt;font-weight:bold;max-height:2.2em;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">' + escapeHtml(p.title) + '</div>'
+      + (p.price || p.variant ? '<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'
+        + (p.price ? '<span style="font-size:9pt;font-weight:bold;">$' + escapeHtml(formatPrice(p.price)) + '</span>' : '')
+        + (p.variant ? '<span style="font-size:6.5pt;font-weight:bold;">' + (p.price ? ' · ' : '') + escapeHtml(p.variant) + '</span>' : '')
+        + '</div>' : '')
+      + (p.sku ? '<div style="font-size:6pt;font-family:Courier New,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(p.sku) + '</div>' : '')
+    + '</div>'
+    + '<div style="position:absolute;right:0;top:0;width:' + g.padWidth + 'in;height:' + g.height + 'in;display:flex;align-items:center;justify-content:center;">' + qr + '</div>';
+}
+
+// Barbell outline (two ends joined by a narrow bar), shown on screen and in the alignment test
+function barbellOutlineSvg() {
+  var g = AVERY_94749, barTop = 0.1875, barBottom = 0.3125, r = 0.02;
+  var right = g.width - g.padWidth;
+  var d = 'M' + r + ' 0H' + g.padWidth + 'V' + barTop + 'H' + right + 'V0H' + (g.width - r)
+    + 'Q' + g.width + ' 0 ' + g.width + ' ' + r + 'V' + (g.height - r) + 'Q' + g.width + ' ' + g.height + ' ' + (g.width - r) + ' ' + g.height
+    + 'H' + right + 'V' + barBottom + 'H' + g.padWidth + 'V' + g.height + 'H' + r + 'Q0 ' + g.height + ' 0 ' + (g.height - r) + 'V' + r + 'Q0 0 ' + r + ' 0Z';
+  return '<svg class="outline" style="position:absolute;inset:0;width:' + g.width + 'in;height:' + g.height + 'in;overflow:visible;" viewBox="0 0 ' + g.width + ' ' + g.height + '"><path d="' + d + '" fill="none" stroke="#999" stroke-width="0.006"/></svg>';
+}
+
+// One absolutely positioned Letter page per 45 cells; null cells are skipped label positions
+function averySheetsHtml(title, cells, note, printOutlines) {
+  var g = AVERY_94749, perSheet = g.cols * g.rows, nudge = nudgeInches(), outline = barbellOutlineSvg(), sheets = '';
+  for (var start = 0; start < cells.length; start += perSheet) {
+    var labels = '';
+    for (var i = 0; i < perSheet; i++) {
+      var cell = cells[start + i];
+      var left = g.left + (i % g.cols) * g.colPitch + nudge.x;
+      var top = g.top + Math.floor(i / g.cols) * g.rowPitch + nudge.y;
+      labels += '<div class="label" style="left:' + left + 'in;top:' + top + 'in;">' + outline + (cell || '') + '</div>';
+    }
+    sheets += '<div class="sheet">' + labels + '</div>';
+  }
+  return '<!DOCTYPE html><html><head><title>' + title + '</title><style>'
+    + '@page{size:letter;margin:0;}'
+    + 'html,body{margin:0;padding:0;background:#ddd;font-family:Arial,sans-serif;}'
+    + '.bar{padding:10px 12px;font-size:12px;color:#444;background:#fff;border-bottom:1px solid #ccc;}'
+    + '.bar button{padding:6px 16px;font-size:13px;margin-right:10px;cursor:pointer;border:1px solid #ccc;border-radius:5px;background:#f5f5f5;}'
+    + '.sheet{position:relative;width:8.5in;height:11in;background:#fff;margin:12px auto;overflow:hidden;page-break-after:always;break-after:page;}'
+    + '.sheet:last-child{page-break-after:auto;break-after:auto;}'
+    + '.label{position:absolute;width:' + g.width + 'in;height:' + g.height + 'in;}'
+    + '@media print{.bar{display:none;} html,body{background:#fff;} .sheet{margin:0;}' + (printOutlines ? '' : ' .outline{display:none;}') + '}'
+    + '</style></head><body>'
+    + '<div class="bar"><button onclick="window.print()">🖨 Print</button>Avery Presta 94749 — print at <strong>100% / Actual size</strong> with margins <strong>None</strong>. ' + note + '</div>'
+    + sheets
+    + '</body></html>';
+}
+
 </script>
 </body>
 </html>
