@@ -137,7 +137,7 @@ barbell jewelry labels (½" × 2½", 45 per Letter sheet, 3 across × 15 down)
 for products already listed in your store. Export your products from Shopify
 admin (**Products → Export → CSV for Excel, Numbers, or other spreadsheet
 programs**), choose that file in the tab, tick the products you want and set
-how many labels each, then **⬡ Print labels**.
+how many labels each, then **↓ Labels PDF**.
 
 Each label has the title, price, variant (e.g. size) and SKU on the left end
 and a QR code on the right end that opens the product's page
@@ -146,11 +146,18 @@ changed in the tab). Draft and archived products are hidden unless **Active
 only** is unticked. **Start at label #** skips labels already used on a partly
 used sheet.
 
-Print with scale **100% / Actual size** and margins **None**. Under **Printer
-alignment**, **Print alignment test** prints the label outlines on plain paper
-so you can check them against a label sheet; if they're off, nudge them by a
-few millimetres there (remembered per browser). The QR code library loads
-from jsDelivr the first time, so it needs an internet connection.
+Labels download as an exact Letter-size PDF. Open it and print with scale
+**100% / Actual size**, not "Fit to page", which shrinks the sheet so labels
+drift further off toward the bottom.
+
+To calibrate a printer, open **Printer alignment** and download the
+**alignment test**. Print it on plain paper and measure from the top edge of
+label #1 to the top edge of label #43. On an exact print that's 233.4 mm; if
+yours differs, enter your measurement and the labels are stretched to cancel
+out the printer's scaling. Then hold the test over a label sheet and use
+**Move right / Move down** (mm) for any remaining even shift. Settings are
+remembered per browser. The PDF and QR code libraries load from jsDelivr the
+first time, so they need an internet connection.
 
 ## Running it locally (optional, for development)
 
