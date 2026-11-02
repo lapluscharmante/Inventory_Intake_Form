@@ -398,18 +398,24 @@
           Start at label #
           <input id="start-label" type="number" min="1" max="45" value="1" style="width:64px; padding:4px 6px; font-size:13px;" />
         </label>
-        <button class="primary" id="print-shopify-btn" onclick="printShopifyTags()" disabled>⬡ Print labels</button>
+        <button class="primary" id="print-shopify-btn" onclick="printShopifyTags()" disabled>↓ Labels PDF</button>
       </div>
     </div>
   </div>
 
   <details style="margin-top:14px; font-size:13px; color:var(--text-muted);">
     <summary style="cursor:pointer;">Printer alignment</summary>
-    <p style="margin:8px 0;">Labels are laid out for <strong>Avery Presta 94749</strong> (45 per Letter sheet, 3 across × 15 down). Print with scale set to <strong>100% / Actual size</strong> and margins set to <strong>None</strong>. Print the alignment test on plain paper and hold it over a label sheet against a window; if the outlines are off, nudge them here and test again.</p>
+    <p style="margin:8px 0;">Labels download as a PDF laid out for <strong>Avery Presta 94749</strong> (45 per Letter sheet, 3 across × 15 down). Open the PDF and print it with scale set to <strong>100% / Actual size</strong> — not "Fit to page", which shrinks the sheet so labels drift further off toward the bottom.</p>
+    <ol style="margin:0 0 10px 18px; padding:0;">
+      <li>Download the alignment test and print it on plain paper.</li>
+      <li>With a ruler, measure from the <strong>top edge of label #1</strong> to the <strong>top edge of label #43</strong> (first label of the bottom row). On an exact print it's <strong>233.4 mm</strong>. If yours is different, enter your measurement below — the labels are stretched to match your printer.</li>
+      <li>Hold the test over a label sheet against a window. If everything is shifted by the same amount, use <strong>Move right / Move down</strong> (negative numbers move left / up).</li>
+    </ol>
     <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+      <label style="margin:0; display:inline-flex; align-items:center; gap:6px;">#1 → #43 measured (mm) <input id="measured-span" type="number" step="0.5" placeholder="233.4" oninput="saveNudge()" style="width:80px; padding:4px 6px; font-size:13px;" /></label>
       <label style="margin:0; display:inline-flex; align-items:center; gap:6px;">Move right (mm) <input id="nudge-x" type="number" step="0.5" value="0" oninput="saveNudge()" style="width:72px; padding:4px 6px; font-size:13px;" /></label>
       <label style="margin:0; display:inline-flex; align-items:center; gap:6px;">Move down (mm) <input id="nudge-y" type="number" step="0.5" value="0" oninput="saveNudge()" style="width:72px; padding:4px 6px; font-size:13px;" /></label>
-      <button class="sm" onclick="printAlignmentTest()">Print alignment test</button>
+      <button class="sm" id="align-test-btn" onclick="printAlignmentTest()">↓ Alignment test PDF</button>
     </div>
   </details>
 </section>
@@ -1682,22 +1688,6 @@ function loadQrLib() {
   });
 }
 
-// Square SVG QR code; one path, crisp module edges for thermal printing
-function qrSvg(qrcode, text, sizeIn) {
-  var qr = qrcode(0, 'L');
-  qr.addData(text);
-  qr.make();
-  var n = qr.getModuleCount(), quiet = 2, d = '';
-  for (var r = 0; r < n; r++) {
-    for (var col = 0; col < n; col++) {
-      if (qr.isDark(r, col)) d += 'M' + (col + quiet) + ' ' + (r + quiet) + 'h1v1h-1z';
-    }
-  }
-  var total = n + quiet * 2;
-  return '<svg xmlns="http://www.w3.org/2000/svg" width="' + sizeIn + 'in" height="' + sizeIn + 'in" viewBox="0 0 ' + total + ' ' + total + '" shape-rendering="crispEdges">'
-    + '<rect width="' + total + '" height="' + total + '" fill="#fff"/><path d="' + d + '" fill="#000"/></svg>';
-}
-
 // Avery Presta 94749 geometry, measured from Avery's template PDF (inches):
 // Letter sheet, 3 × 15 labels of 2.5" × 0.5". Each barbell label has a 0.92"
 // printable end on each side joined by a narrow 0.66" bar.
@@ -1710,114 +1700,182 @@ var AVERY_94749 = {
 };
 var NUDGE_KEY = 'jewelry_inventory_label_nudge';
 
+// Distance from the top of label #1 to the top of label #43 on an exact print
+var SPAN_MM = 14 * AVERY_94749.rowPitch * 25.4;
+
 window.addEventListener('load', function() {
   try {
     var n = JSON.parse(localStorage.getItem(NUDGE_KEY)) || {};
     document.getElementById('nudge-x').value = n.x || 0;
     document.getElementById('nudge-y').value = n.y || 0;
+    document.getElementById('measured-span').value = n.span || '';
   } catch(e) {}
 });
 
 function saveNudge() {
-  try { localStorage.setItem(NUDGE_KEY, JSON.stringify({ x: parseFloat(v('nudge-x')) || 0, y: parseFloat(v('nudge-y')) || 0 })); } catch(e) {}
+  try {
+    localStorage.setItem(NUDGE_KEY, JSON.stringify({
+      x: parseFloat(v('nudge-x')) || 0,
+      y: parseFloat(v('nudge-y')) || 0,
+      span: parseFloat(v('measured-span')) || ''
+    }));
+  } catch(e) {}
 }
 
-function nudgeInches() {
-  return { x: (parseFloat(v('nudge-x')) || 0) / 25.4, y: (parseFloat(v('nudge-y')) || 0) / 25.4 };
+// Maps template inches to PDF inches, undoing the printer's own scaling (from the
+// measured #1→#43 distance) and then applying the manual shift
+function labelTransform() {
+  var measured = parseFloat(v('measured-span'));
+  var k = measured > SPAN_MM * 0.8 && measured < SPAN_MM * 1.2 ? SPAN_MM / measured : 1;
+  var nx = (parseFloat(v('nudge-x')) || 0) / 25.4, ny = (parseFloat(v('nudge-y')) || 0) / 25.4;
+  return { k: k, x: function(x) { return x * k + nx; }, y: function(y) { return y * k + ny; } };
 }
 
 async function printShopifyTags() {
   var chosen = shopifyProducts.filter(function(p) { return p.selected; });
   if (!chosen.length) return;
-  // Open the window right away (inside the tap) so iPad Safari doesn't block it as a pop-up
-  var w = window.open('', '_blank', 'width=900,height=700');
-  if (!w) { alert('Allow pop-ups for this site to print labels.'); return; }
-  w.document.write('<p style="font-family:Arial,sans-serif;">Making labels…</p>');
+  var btn = document.getElementById('print-shopify-btn');
+  btn.disabled = true;
+  btn.textContent = 'Making labels…';
   try {
-    var qrcode = await loadQrLib();
+    var libs = await Promise.all([loadJsPDF(), loadQrLib()]);
+    var jsPDF = libs[0], qrcode = libs[1];
     var base = storeBaseUrl();
     var start = Math.max(1, Math.min(45, parseInt(v('start-label'), 10) || 1));
     var cells = [];
     for (var i = 1; i < start; i++) cells.push(null);
     chosen.forEach(function(p) {
-      var qr = qrSvg(qrcode, base + '/products/' + encodeURIComponent(p.handle), 0.44);
-      for (var c = 0; c < p.copies; c++) cells.push(averyLabelHtml(p, qr));
+      var qr = qrcode(0, 'L');
+      qr.addData(base + '/products/' + encodeURIComponent(p.handle));
+      qr.make();
+      for (var c = 0; c < p.copies; c++) cells.push({ product: p, qr: qr });
     });
+    var doc = new jsPDF({ orientation: 'portrait', unit: 'in', format: 'letter' });
+    drawAveryPages(doc, cells, function(doc, cell, x, y, t) { drawAveryLabel(doc, cell, x, y, t); }, false);
+    doc.save('shopify_labels_' + new Date().toISOString().slice(0,10) + '.pdf');
     var labels = cells.filter(Boolean).length;
-    var sheets = Math.ceil(cells.length / (AVERY_94749.cols * AVERY_94749.rows));
-    var note = labels + ' label' + (labels !== 1 ? 's' : '') + ' on ' + sheets + ' sheet' + (sheets !== 1 ? 's' : '')
-      + (start > 1 ? ', starting at label #' + start : '') + '. QR codes link to ' + escapeHtml(base) + '/products/…';
-    w.document.open();
-    w.document.write(averySheetsHtml('Shopify Product Labels', cells, note, false));
-    w.document.close();
+    showSessionMsg('Downloaded ' + labels + ' label' + (labels !== 1 ? 's' : '') + ' — print at 100% / Actual size.');
   } catch(e) {
-    w.close();
     alert('Couldn\'t make the labels: ' + e.message);
   }
+  btn.textContent = '↓ Labels PDF';
+  updateSelectedCount();
 }
 
-function printAlignmentTest() {
-  var w = window.open('', '_blank', 'width=900,height=700');
-  if (!w) { alert('Allow pop-ups for this site to print the test.'); return; }
-  var cells = [];
-  for (var i = 1; i <= AVERY_94749.cols * AVERY_94749.rows; i++) {
-    cells.push('<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:bold 9px Arial,sans-serif;">#' + i + '</div>');
+async function printAlignmentTest() {
+  var btn = document.getElementById('align-test-btn');
+  btn.disabled = true;
+  try {
+    var jsPDF = await loadJsPDF();
+    var doc = new jsPDF({ orientation: 'portrait', unit: 'in', format: 'letter' });
+    var cells = [];
+    for (var i = 1; i <= AVERY_94749.cols * AVERY_94749.rows; i++) cells.push(i);
+    drawAveryPages(doc, cells, function(doc, n, x, y, t) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9 * t.k);
+      doc.text('#' + n, x + AVERY_94749.width / 2 * t.k, y + (AVERY_94749.height / 2 + 0.045) * t.k, { align: 'center' });
+    }, true);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.text('Avery Presta 94749 alignment test. Print at 100% / Actual size. Top of #1 to top of #43 should measure ' + SPAN_MM.toFixed(1) + ' mm.', 0.25, 0.35);
+    doc.save('label_alignment_test.pdf');
+  } catch(e) {
+    alert('Couldn\'t make the test page: ' + e.message);
   }
-  w.document.write(averySheetsHtml('Label Alignment Test', cells, 'Print on plain paper and hold over a label sheet against a window.', true));
-  w.document.close();
+  btn.disabled = false;
 }
 
-// Title, price and SKU on the left end; QR code on the right end
-function averyLabelHtml(p, qr) {
-  var g = AVERY_94749, inset = 0.04;
-  // The variant goes beside the price so a long title can't push it out of view
-  return '<div style="position:absolute;left:' + inset + 'in;top:' + inset + 'in;width:' + (g.padWidth - 2 * inset) + 'in;height:' + (g.height - 2 * inset) + 'in;display:flex;flex-direction:column;justify-content:center;overflow:hidden;font-family:Arial,sans-serif;color:#000;line-height:1.1;">'
-      + '<div style="font-size:6.5pt;font-weight:bold;max-height:2.2em;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">' + escapeHtml(p.title) + '</div>'
-      + (p.price || p.variant ? '<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'
-        + (p.price ? '<span style="font-size:9pt;font-weight:bold;">$' + escapeHtml(formatPrice(p.price)) + '</span>' : '')
-        + (p.variant ? '<span style="font-size:6.5pt;font-weight:bold;">' + (p.price ? ' · ' : '') + escapeHtml(p.variant) + '</span>' : '')
-        + '</div>' : '')
-      + (p.sku ? '<div style="font-size:6pt;font-family:Courier New,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(p.sku) + '</div>' : '')
-    + '</div>'
-    + '<div style="position:absolute;right:0;top:0;width:' + g.padWidth + 'in;height:' + g.height + 'in;display:flex;align-items:center;justify-content:center;">' + qr + '</div>';
-}
-
-// Barbell outline (two ends joined by a narrow bar), shown on screen and in the alignment test
-function barbellOutlineSvg() {
-  var g = AVERY_94749, barTop = 0.1875, barBottom = 0.3125, r = 0.02;
-  var right = g.width - g.padWidth;
-  var d = 'M' + r + ' 0H' + g.padWidth + 'V' + barTop + 'H' + right + 'V0H' + (g.width - r)
-    + 'Q' + g.width + ' 0 ' + g.width + ' ' + r + 'V' + (g.height - r) + 'Q' + g.width + ' ' + g.height + ' ' + (g.width - r) + ' ' + g.height
-    + 'H' + right + 'V' + barBottom + 'H' + g.padWidth + 'V' + g.height + 'H' + r + 'Q0 ' + g.height + ' 0 ' + (g.height - r) + 'V' + r + 'Q0 0 ' + r + ' 0Z';
-  return '<svg class="outline" style="position:absolute;inset:0;width:' + g.width + 'in;height:' + g.height + 'in;overflow:visible;" viewBox="0 0 ' + g.width + ' ' + g.height + '"><path d="' + d + '" fill="none" stroke="#999" stroke-width="0.006"/></svg>';
-}
-
-// One absolutely positioned Letter page per 45 cells; null cells are skipped label positions
-function averySheetsHtml(title, cells, note, printOutlines) {
-  var g = AVERY_94749, perSheet = g.cols * g.rows, nudge = nudgeInches(), outline = barbellOutlineSvg(), sheets = '';
-  for (var start = 0; start < cells.length; start += perSheet) {
-    var labels = '';
-    for (var i = 0; i < perSheet; i++) {
-      var cell = cells[start + i];
-      var left = g.left + (i % g.cols) * g.colPitch + nudge.x;
-      var top = g.top + Math.floor(i / g.cols) * g.rowPitch + nudge.y;
-      labels += '<div class="label" style="left:' + left + 'in;top:' + top + 'in;">' + outline + (cell || '') + '</div>';
+// Lays cells out 45 to a Letter page; null cells are skipped label positions
+function drawAveryPages(doc, cells, drawCell, outlines) {
+  var g = AVERY_94749, perPage = g.cols * g.rows, t = labelTransform();
+  for (var start = 0; start < cells.length; start += perPage) {
+    if (start > 0) doc.addPage('letter', 'portrait');
+    for (var i = 0; i < perPage && start + i < cells.length; i++) {
+      var x = t.x(g.left + (i % g.cols) * g.colPitch);
+      var y = t.y(g.top + Math.floor(i / g.cols) * g.rowPitch);
+      if (outlines) drawBarbellOutline(doc, x, y, t.k);
+      if (cells[start + i] !== null) drawCell(doc, cells[start + i], x, y, t);
     }
-    sheets += '<div class="sheet">' + labels + '</div>';
+    if (outlines) {
+      // Outline the rest of the page too, so the whole sheet can be checked
+      for (var j = cells.length - start; j < perPage; j++) {
+        drawBarbellOutline(doc, t.x(g.left + (j % g.cols) * g.colPitch), t.y(g.top + Math.floor(j / g.cols) * g.rowPitch), t.k);
+      }
+    }
   }
-  return '<!DOCTYPE html><html><head><title>' + title + '</title><style>'
-    + '@page{size:letter;margin:0;}'
-    + 'html,body{margin:0;padding:0;background:#ddd;font-family:Arial,sans-serif;}'
-    + '.bar{padding:10px 12px;font-size:12px;color:#444;background:#fff;border-bottom:1px solid #ccc;}'
-    + '.bar button{padding:6px 16px;font-size:13px;margin-right:10px;cursor:pointer;border:1px solid #ccc;border-radius:5px;background:#f5f5f5;}'
-    + '.sheet{position:relative;width:8.5in;height:11in;background:#fff;margin:12px auto;overflow:hidden;page-break-after:always;break-after:page;}'
-    + '.sheet:last-child{page-break-after:auto;break-after:auto;}'
-    + '.label{position:absolute;width:' + g.width + 'in;height:' + g.height + 'in;}'
-    + '@media print{.bar{display:none;} html,body{background:#fff;} .sheet{margin:0;}' + (printOutlines ? '' : ' .outline{display:none;}') + '}'
-    + '</style></head><body>'
-    + '<div class="bar"><button onclick="window.print()">🖨 Print</button>Avery Presta 94749 — print at <strong>100% / Actual size</strong> with margins <strong>None</strong>. ' + note + '</div>'
-    + sheets
-    + '</body></html>';
+}
+
+// Two printable ends joined by a narrow bar, as on the Avery template
+function drawBarbellOutline(doc, x, y, k) {
+  var g = AVERY_94749, barTop = 0.1875, barBottom = 0.3125, right = g.width - g.padWidth;
+  var pts = [[0,0],[g.padWidth,0],[g.padWidth,barTop],[right,barTop],[right,0],[g.width,0],[g.width,g.height],
+             [right,g.height],[right,barBottom],[g.padWidth,barBottom],[g.padWidth,g.height],[0,g.height]];
+  doc.setDrawColor(150);
+  doc.setLineWidth(0.006);
+  var segs = [];
+  for (var i = 1; i < pts.length; i++) segs.push([(pts[i][0] - pts[i-1][0]) * k, (pts[i][1] - pts[i-1][1]) * k]);
+  doc.lines(segs, x + pts[0][0] * k, y + pts[0][1] * k, [1, 1], 'S', true);
+  doc.setDrawColor(0);
+}
+
+// Title, price + variant and SKU on the left end; QR code on the right end
+function drawAveryLabel(doc, cell, x, y, t) {
+  var g = AVERY_94749, p = cell.product, k = t.k, inset = 0.05;
+  var textW = (g.padWidth - 2 * inset) * k;
+  var lh = function(pt) { return pt / 72 * 1.1 * k; };
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5 * k);
+  var titleLines = clampLines(doc, doc.splitTextToSize(p.title, textW), 2, textW);
+  var hasPriceLine = p.price || p.variant;
+  var blockH = titleLines.length * lh(6.5) + (hasPriceLine ? lh(9) : 0) + (p.sku ? lh(6) : 0);
+  var cy = y + (g.height * k - blockH) / 2;
+  var left = x + inset * k;
+
+  cy += lh(6.5) * 0.8;
+  doc.text(titleLines, left, cy, { lineHeightFactor: 1.1 });
+  cy += (titleLines.length - 1) * lh(6.5);
+
+  if (hasPriceLine) {
+    cy += lh(9) * 0.95;
+    var cx = left;
+    if (p.price) {
+      doc.setFontSize(9 * k);
+      var priceText = '$' + formatPrice(p.price);
+      doc.text(priceText, cx, cy);
+      cx += doc.getTextWidth(priceText);
+    }
+    if (p.variant) {
+      doc.setFontSize(6.5 * k);
+      var variantText = (p.price ? ' · ' : '') + p.variant;
+      var room = left + textW - cx;
+      while (variantText.length > 1 && doc.getTextWidth(variantText) > room) variantText = variantText.slice(0, -2) + '…';
+      doc.text(variantText, cx, cy);
+    }
+  }
+  if (p.sku) {
+    cy += lh(6) * 1.0;
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(6 * k);
+    var sku = p.sku;
+    while (sku.length > 1 && doc.getTextWidth(sku) > textW) sku = sku.slice(0, -2) + '…';
+    doc.text(sku, left, cy);
+  }
+
+  // QR code: dark modules as filled runs, with a 2-module quiet zone, centred on the right end
+  var qr = cell.qr, n = qr.getModuleCount(), size = 0.44 * k, cellSize = size / (n + 4);
+  var qx = x + (g.width - g.padWidth / 2) * k - size / 2 + 2 * cellSize;
+  var qy = y + g.height / 2 * k - size / 2 + 2 * cellSize;
+  doc.setFillColor(0);
+  for (var r = 0; r < n; r++) {
+    for (var c = 0; c < n; c++) {
+      if (!qr.isDark(r, c)) continue;
+      var run = 1;
+      while (c + run < n && qr.isDark(r, c + run)) run++;
+      doc.rect(qx + c * cellSize, qy + r * cellSize, run * cellSize, cellSize, 'F');
+      c += run - 1;
+    }
+  }
 }
 
 </script>
