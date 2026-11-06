@@ -373,7 +373,7 @@
       <span id="shopify-csv-name" style="font-size:12px; color:var(--text-subtle); margin-left:6px;"></span>
     </div>
     <div>
-      <label>Your store's web address <span style="font-size:11px; color:var(--text-subtle);">(QR codes link to …/products/&lt;handle&gt;)</span></label>
+      <label>Your store's web address <span style="font-size:11px; color:var(--text-subtle);">(QR codes link to …/products/&lt;handle&gt; or …/search?q=&lt;SKU&gt;)</span></label>
       <input id="store-url" type="url" placeholder="https://lapluscharmante.com" oninput="saveStoreUrl()" />
     </div>
   </div>
@@ -399,6 +399,13 @@
           <select id="label-format" onchange="setLabelFormat(this.value)" style="width:auto; padding:4px 6px; font-size:13px;">
             <option value="avery94749">Avery Presta 94749 sheet (½" × 2½")</option>
             <option value="roll1x2125">Roll label 1" × 2.125" — 2 per label, cut in half</option>
+          </select>
+        </label>
+        <label style="margin:0; display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--text-muted);" title="A search link is much shorter, so its QR code has bigger squares and scans more easily from small thermal-printed labels">
+          QR opens
+          <select id="qr-target" onchange="setQrTarget(this.value)" style="width:auto; padding:4px 6px; font-size:13px;">
+            <option value="product">Product page</option>
+            <option value="sku">Store search by SKU (easier to scan)</option>
           </select>
         </label>
         <label class="sheet-only" style="margin:0; display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--text-muted);" title="Skip labels already used on a partly used sheet">
@@ -1741,6 +1748,25 @@ function labelTransform() {
 }
 
 var LABEL_FORMAT_KEY = 'jewelry_inventory_label_format';
+var QR_TARGET_KEY = 'jewelry_inventory_qr_target';
+
+function setQrTarget(target) {
+  document.getElementById('qr-target').value = target;
+  try { localStorage.setItem(QR_TARGET_KEY, target); } catch(e) {}
+}
+
+window.addEventListener('load', function() {
+  var saved = null;
+  try { saved = localStorage.getItem(QR_TARGET_KEY); } catch(e) {}
+  setQrTarget(saved === 'sku' ? 'sku' : 'product');
+});
+
+// The product page, or — when chosen and the product has a SKU — the store's search
+// for that SKU, whose much shorter link makes a QR code with fewer, bigger squares
+function qrLink(base, p) {
+  if (v('qr-target') === 'sku' && p.sku) return base + '/search?q=' + encodeURIComponent(p.sku);
+  return base + '/products/' + encodeURIComponent(p.handle);
+}
 // 2.125" × 1" roll label holding two ½"-tall tags, stacked, to be cut apart;
 // each tag has the same 0.92" ends and text sizes as the Avery barbell labels
 var ROLL_1X2125 = { width: 2.125, height: 1, tagHeight: 0.5, padWidth: 0.92 };
@@ -1778,7 +1804,7 @@ async function printShopifyTags() {
     for (var i = 1; i < start; i++) cells.push(null);
     chosen.forEach(function(p) {
       var qr = qrcode(0, 'L');
-      qr.addData(base + '/products/' + encodeURIComponent(p.handle));
+      qr.addData(qrLink(base, p));
       qr.make();
       for (var c = 0; c < p.copies; c++) cells.push({ product: p, qr: qr });
     });
@@ -1868,19 +1894,20 @@ function drawAveryLabel(doc, cell, x, y, t) {
 }
 
 // One small tag: text on the left end, QR code on the right end (k scales everything)
-function drawBarbellTag(doc, cell, x, y, width, height, padWidth, k) {
+function drawBarbellTag(doc, cell, x, y, width, height, padWidth, k, qrSize) {
   var inset = 0.05;
   drawLabelText(doc, cell.product, x + inset * k, y, (padWidth - 2 * inset) * k, height * k,
     { title: 6.5 * k, titleLines: 2, price: 9 * k, small: 6.5 * k, sku: 6 * k });
-  drawQr(doc, cell.qr, x + (width - padWidth / 2) * k, y + height / 2 * k, 0.44 * k);
+  drawQr(doc, cell.qr, x + (width - padWidth / 2) * k, y + height / 2 * k, (qrSize || 0.44) * k);
 }
 
 // Two tags on one 2.125" × 1" roll label (either may be missing), with short
 // cut marks at both edges of the halfway line
 function drawRollLabel(doc, top, bottom) {
   var g = ROLL_1X2125;
-  if (top) drawBarbellTag(doc, top, 0, 0, g.width, g.tagHeight, g.padWidth, 1);
-  if (bottom) drawBarbellTag(doc, bottom, 0, g.tagHeight, g.width, g.tagHeight, g.padWidth, 1);
+  // Roll tags are cut apart, so the QR code can use nearly the full ½" height
+  if (top) drawBarbellTag(doc, top, 0, 0, g.width, g.tagHeight, g.padWidth, 1, 0.48);
+  if (bottom) drawBarbellTag(doc, bottom, 0, g.tagHeight, g.width, g.tagHeight, g.padWidth, 1, 0.48);
   doc.setDrawColor(0);
   doc.setLineWidth(0.01);
   doc.line(0, g.tagHeight, 0.08, g.tagHeight);
