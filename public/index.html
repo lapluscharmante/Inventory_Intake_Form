@@ -384,7 +384,7 @@
     <div class="product-tools">
       <input type="search" id="product-search" placeholder="Search title or SKU…" oninput="renderProductList()" />
       <label style="margin:0; display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--text-muted);">
-        <input type="checkbox" id="active-only" checked onchange="renderProductList()" style="width:auto;" /> Active only
+        <input type="checkbox" id="active-only" checked onchange="renderProductList()" style="width:auto;" /> Hide drafts &amp; archived
       </label>
       <button class="sm" onclick="selectShownProducts(true)">Select shown</button>
       <button class="sm" onclick="selectShownProducts(false)">Clear shown</button>
@@ -1640,9 +1640,10 @@ function handleShopifyCsv(event) {
 
 function shownProducts() {
   var q = v('product-search').toLowerCase();
-  var activeOnly = document.getElementById('active-only').checked;
+  // Unlisted products are live (reachable by link, just not in search or collections), so they stay
+  var hideOffline = document.getElementById('active-only').checked;
   return shopifyProducts.filter(function(p) {
-    if (activeOnly && p.status !== 'active') return false;
+    if (hideOffline && (p.status === 'draft' || p.status === 'archived')) return false;
     return !q || (p.title + ' ' + p.variant + ' ' + p.sku).toLowerCase().indexOf(q) >= 0;
   });
 }
@@ -1762,9 +1763,10 @@ window.addEventListener('load', function() {
 });
 
 // The product page, or — when chosen and the product has a SKU — the store's search
-// for that SKU, whose much shorter link makes a QR code with fewer, bigger squares
+// for that SKU, whose much shorter link makes a QR code with fewer, bigger squares.
+// Unlisted products never appear in the store's search, so they always get the product page.
 function qrLink(base, p) {
-  if (v('qr-target') === 'sku' && p.sku) return base + '/search?q=' + encodeURIComponent(p.sku);
+  if (v('qr-target') === 'sku' && p.sku && p.status !== 'unlisted') return base + '/search?q=' + encodeURIComponent(p.sku);
   return base + '/products/' + encodeURIComponent(p.handle);
 }
 // 2.125" × 1" roll label holding two ½"-tall tags, stacked, to be cut apart;
