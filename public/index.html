@@ -167,6 +167,12 @@
   .product-row .item-info { cursor: pointer; }
   .product-row .copies { width: 64px; flex-shrink: 0; padding: 4px 6px; font-size: 13px; }
   .status-badge { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--border-strong); color: var(--text-muted); margin-left: 6px; vertical-align: middle; }
+  .scan-view { position: relative; width: 100%; max-width: 520px; aspect-ratio: 4 / 3; background: #111; border-radius: var(--radius-lg); overflow: hidden; margin: 0 auto 12px; }
+  .scan-view video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .scan-view .scan-box { position: absolute; left: 25%; top: 25%; width: 50%; height: 50%; border: 2px solid rgba(255,255,255,0.85); border-radius: 8px; box-shadow: 0 0 0 999px rgba(0,0,0,0.25); pointer-events: none; }
+  .scan-result { border: 1px solid var(--accent-border); background: var(--accent-bg); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 12px; }
+  .scan-result .item-title { white-space: normal; font-size: 16px; margin-bottom: 4px; }
+  .scan-result a.open-link { display: inline-block; margin-top: 10px; padding: 10px 18px; font-size: 15px; border-radius: var(--radius); background: var(--accent); color: #fff; text-decoration: none; }
   .print-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 
   @media (max-width: 600px) {
@@ -202,6 +208,7 @@
 <nav class="tabs" role="tablist">
   <button class="tab active" id="tab-btn-intake" role="tab" onclick="showTab('intake')">Intake</button>
   <button class="tab" id="tab-btn-shopify" role="tab" onclick="showTab('shopify')">Shopify tags</button>
+  <button class="tab" id="tab-btn-scan" role="tab" onclick="showTab('scan')">Scan</button>
 </nav>
 
 <div id="tab-intake">
@@ -406,6 +413,7 @@
           <select id="qr-target" onchange="setQrTarget(this.value)" style="width:auto; padding:4px 6px; font-size:13px;">
             <option value="product">Product page</option>
             <option value="sku">Store search by SKU (easier to scan)</option>
+            <option value="scan">Scan tab in this tool (smallest code)</option>
           </select>
         </label>
         <label class="sheet-only" style="margin:0; display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--text-muted);" title="Skip labels already used on a partly used sheet">
@@ -436,6 +444,27 @@
   </details>
 </section>
 
+</div>
+
+<div id="tab-scan" style="display:none;">
+<section>
+  <h2>Scan a tag <span style="font-size:11px; font-weight:normal; letter-spacing:0; text-transform:none; color:var(--text-subtle);">opens the listing for a label printed with "QR opens: Scan tab"</span></h2>
+  <p id="scan-source" style="font-size:12px; color:var(--text-subtle); margin-bottom:12px;"></p>
+  <div id="scan-result"></div>
+  <div class="scan-view" id="scan-view" style="display:none;">
+    <video id="scan-video" playsinline muted></video>
+    <div class="scan-box"></div>
+  </div>
+  <p id="scan-status" style="font-size:13px; color:var(--text-muted); text-align:center; margin-bottom:12px;"></p>
+  <div class="btn-row" style="justify-content:center; margin-bottom:16px;">
+    <button class="primary" id="scan-start-btn" onclick="startScanner()">📷 Start scanning</button>
+    <button id="scan-stop-btn" onclick="stopScanner()" style="display:none;">Stop</button>
+  </div>
+  <div style="display:flex; gap:8px; max-width:520px; margin:0 auto;">
+    <input type="search" id="scan-manual" placeholder="Or type a SKU…" onkeydown="if (event.key === 'Enter') lookupManual()" />
+    <button onclick="lookupManual()">Find</button>
+  </div>
+</section>
 </div>
 
 </main>
@@ -1515,7 +1544,9 @@ function setSelect(id, val) {
 var TAB_KEY = 'jewelry_inventory_tab';
 
 function showTab(name) {
-  ['intake', 'shopify'].forEach(function(t) {
+  if (name !== 'scan') stopScanner();
+  else updateScanSource();
+  ['intake', 'shopify', 'scan'].forEach(function(t) {
     document.getElementById('tab-' + t).style.display = t === name ? 'block' : 'none';
     document.getElementById('tab-btn-' + t).classList.toggle('active', t === name);
   });
@@ -1525,7 +1556,7 @@ function showTab(name) {
 window.addEventListener('load', function() {
   var tab = null;
   try { tab = localStorage.getItem(TAB_KEY); } catch(e) {}
-  if (tab === 'shopify') showTab('shopify');
+  if (tab === 'shopify' || tab === 'scan') showTab(tab);
   try { document.getElementById('store-url').value = localStorage.getItem(STORE_URL_KEY) || DEFAULT_STORE_URL; } catch(e) {
     document.getElementById('store-url').value = DEFAULT_STORE_URL;
   }
@@ -1625,6 +1656,7 @@ function handleShopifyCsv(event) {
   reader.onload = function(e) {
     try {
       shopifyProducts = productsFromCsv(e.target.result);
+      saveScanProducts(file.name, shopifyProducts);
       document.getElementById('shopify-csv-name').textContent = file.name;
       document.getElementById('product-search').value = '';
       document.getElementById('shopify-products').style.display = 'block';
@@ -1759,7 +1791,7 @@ function setQrTarget(target) {
 window.addEventListener('load', function() {
   var saved = null;
   try { saved = localStorage.getItem(QR_TARGET_KEY); } catch(e) {}
-  setQrTarget(saved === 'sku' ? 'sku' : 'product');
+  setQrTarget(saved === 'sku' || saved === 'scan' ? saved : 'product');
 });
 
 // The product page, or — when chosen and the product has a SKU — the store's search
@@ -1805,9 +1837,8 @@ async function printShopifyTags() {
     var cells = [];
     for (var i = 1; i < start; i++) cells.push(null);
     chosen.forEach(function(p) {
-      var qr = qrcode(0, 'L');
-      qr.addData(qrLink(base, p));
-      qr.make();
+      var qr = v('qr-target') === 'scan' ? smallestQr(qrcode, scanCode(p)) : qrcode(0, 'L');
+      if (v('qr-target') !== 'scan') { qr.addData(qrLink(base, p)); qr.make(); }
       for (var c = 0; c < p.copies; c++) cells.push({ product: p, qr: qr });
     });
     var doc;
@@ -1983,6 +2014,171 @@ function drawQr(doc, qr, cx, cy, size) {
   }
 }
 
+
+// ── Scan tab ──────────────────────────────────────────────────────────────────
+// Labels printed with "QR opens: Scan tab" hold only a short code — the SKU, or for
+// a product without one a short code made from its handle — so the QR code is the
+// smallest possible (21 × 21 squares) and survives thermal printing. This tab reads
+// it with the camera and looks it up in the last products CSV loaded on this device.
+var JSQR_URL = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';
+var SCAN_PRODUCTS_KEY = 'jewelry_inventory_scan_products';
+var scanStream = null, scanTimer = null;
+
+function scanCode(p) {
+  if (p.sku) return p.sku;
+  // FNV-1a hash of handle + variant, as 6 base-36 characters
+  var text = p.handle + '|' + p.variant, h = 0x811c9dc5;
+  for (var i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return '#' + ('000000' + h.toString(36)).slice(-6);
+}
+
+// The smallest QR code that holds the text, with the strongest error correction that still fits
+function smallestQr(qrcode, text) {
+  for (var type = 1; type <= 10; type++) {
+    var levels = ['H', 'Q', 'M', 'L'];
+    for (var i = 0; i < levels.length; i++) {
+      try {
+        var qr = qrcode(type, levels[i]);
+        qr.addData(text);
+        qr.make();
+        return qr;
+      } catch(e) {}
+    }
+  }
+  var fallback = qrcode(0, 'L');
+  fallback.addData(text);
+  fallback.make();
+  return fallback;
+}
+
+function saveScanProducts(fileName, products) {
+  try {
+    localStorage.setItem(SCAN_PRODUCTS_KEY, JSON.stringify({
+      file: fileName,
+      savedAt: new Date().toISOString(),
+      products: products.map(function(p) { return { handle: p.handle, title: p.title, variant: p.variant, sku: p.sku, price: p.price, status: p.status }; })
+    }));
+  } catch(e) {}
+}
+
+function loadScanProducts() {
+  try { return JSON.parse(localStorage.getItem(SCAN_PRODUCTS_KEY)); } catch(e) { return null; }
+}
+
+function updateScanSource() {
+  var saved = loadScanProducts(), el = document.getElementById('scan-source');
+  if (saved && saved.products && saved.products.length) {
+    el.textContent = 'Looking up tags in ' + saved.products.length + ' products from ' + saved.file + ' (loaded ' + new Date(saved.savedAt).toLocaleDateString() + '). Load a newer CSV in Shopify tags to update.';
+  } else {
+    el.textContent = 'No products loaded on this device yet — load your products CSV in the Shopify tags tab first.';
+  }
+}
+
+// Finds the product for a scanned code; also understands older labels whose QR holds a full link
+function findScanned(text) {
+  var saved = loadScanProducts();
+  var products = saved && saved.products ? saved.products : [];
+  text = String(text).trim();
+  var m = text.match(/\/products\/([^/?#]+)/);
+  if (m) {
+    var handle = decodeURIComponent(m[1]);
+    return products.filter(function(p) { return p.handle === handle; })[0] || { handle: handle, title: handle, variant: '', sku: '', price: '', status: '' };
+  }
+  m = text.match(/[?&]q=([^&#]+)/);
+  if (m) text = decodeURIComponent(m[1].replace(/\+/g, ' '));
+  var lower = text.toLowerCase();
+  return products.filter(function(p) { return scanCode(p).toLowerCase() === lower || (p.sku && p.sku.toLowerCase() === lower); })[0] || null;
+}
+
+function showScanResult(text) {
+  var p = findScanned(text), el = document.getElementById('scan-result');
+  if (!p) {
+    el.innerHTML = '<div class="error-msg" style="display:block;">No product found for “' + escapeHtml(text) + '”. If it\'s new, export your products from Shopify again and load the CSV in Shopify tags.</div>';
+    return;
+  }
+  var url = storeBaseUrl() + '/products/' + encodeURIComponent(p.handle);
+  var meta = [p.sku, p.price ? '$' + formatPrice(p.price) : '', p.status && p.status !== 'active' ? p.status : ''].filter(Boolean).join(' · ');
+  el.innerHTML = '<div class="scan-result">'
+    + '<div class="item-title">' + escapeHtml(p.title) + (p.variant ? ' — ' + escapeHtml(p.variant) : '') + '</div>'
+    + (meta ? '<div class="item-meta">' + escapeHtml(meta) + '</div>' : '')
+    + '<a class="open-link" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">Open listing ↗</a>'
+    + '</div>';
+}
+
+function lookupManual() {
+  var text = v('scan-manual');
+  if (text) showScanResult(text);
+}
+
+function loadJsQR() {
+  if (window.jsQR) return Promise.resolve(window.jsQR);
+  return new Promise(function(resolve, reject) {
+    var script = document.createElement('script');
+    script.src = JSQR_URL;
+    script.onload = function() { window.jsQR ? resolve(window.jsQR) : reject(new Error('Scanner failed to load')); };
+    script.onerror = function() { reject(new Error('Could not load the scanner — check your internet connection')); };
+    document.head.appendChild(script);
+  });
+}
+
+async function startScanner() {
+  var status = document.getElementById('scan-status');
+  updateScanSource();
+  document.getElementById('scan-result').innerHTML = '';
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    status.textContent = 'This browser can\'t use the camera. Type the SKU below instead.';
+    return;
+  }
+  try {
+    var jsQR = await loadJsQR();
+    scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
+    var video = document.getElementById('scan-video');
+    video.srcObject = scanStream;
+    await video.play();
+    document.getElementById('scan-view').style.display = 'block';
+    document.getElementById('scan-start-btn').style.display = 'none';
+    document.getElementById('scan-stop-btn').style.display = '';
+    status.textContent = 'Hold the tag inside the box, about 4–6 inches away, and let the camera focus.';
+    var canvas = document.createElement('canvas'), ctx = canvas.getContext('2d', { willReadFrequently: true });
+    var tick = function() {
+      if (!scanStream) return;
+      if (video.readyState >= 2 && video.videoWidth) {
+        // Read the middle of the picture at full resolution, so a tiny code still has enough pixels
+        var w = Math.round(video.videoWidth * 0.6), h = Math.round(video.videoHeight * 0.6);
+        canvas.width = w; canvas.height = h;
+        ctx.drawImage(video, (video.videoWidth - w) / 2, (video.videoHeight - h) / 2, w, h, 0, 0, w, h);
+        var found = jsQR(ctx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: 'dontInvert' });
+        if (found && found.data) {
+          if (navigator.vibrate) navigator.vibrate(80);
+          showScanResult(found.data);
+          stopScanner();
+          document.getElementById('scan-start-btn').textContent = '📷 Scan another';
+          status.textContent = '';
+          return;
+        }
+      }
+      scanTimer = setTimeout(tick, 120);
+    };
+    tick();
+  } catch(e) {
+    stopScanner();
+    status.textContent = e && e.name === 'NotAllowedError'
+      ? 'Camera access was blocked. Allow the camera for this site in your browser settings, then try again.'
+      : 'Couldn\'t start the camera: ' + (e && e.message ? e.message : e);
+  }
+}
+
+function stopScanner() {
+  if (scanTimer) { clearTimeout(scanTimer); scanTimer = null; }
+  if (scanStream) { scanStream.getTracks().forEach(function(t) { t.stop(); }); scanStream = null; }
+  var view = document.getElementById('scan-view');
+  if (view) view.style.display = 'none';
+  var start = document.getElementById('scan-start-btn'), stop = document.getElementById('scan-stop-btn');
+  if (start) start.style.display = '';
+  if (stop) stop.style.display = 'none';
+}
+
+window.addEventListener('load', updateScanSource);
 </script>
 </body>
 </html>

@@ -165,6 +165,16 @@ SKU, one tap from the listing. Products without a SKU, and unlisted products
 and the **speed** down: thermal printing spreads black into the QR code's
 white gaps, which is the usual reason a small code won't scan.
 
+**QR opens: Scan tab in this tool** prints the smallest, sturdiest code: it
+holds only the SKU (or, for a product without one, a short code like
+`#au5aom` made from its handle), so it's 21 × 21 squares with extra error
+correction, the most reliable choice for thermal-printed roll labels. These
+codes aren't web links: scan them with the **Scan** tab, which uses the
+camera, looks the code up in the last products CSV loaded on that device and
+offers **Open listing**. It also works for unlisted products, reads older
+labels whose QR holds a full link, and has a box to type a SKU instead. Load
+a fresh CSV in Shopify tags after adding products so new tags can be found.
+
 Avery labels download as an exact Letter-size PDF. Open it and print with scale
 **100% / Actual size**, not "Fit to page", which shrinks the sheet so labels
 drift further off toward the bottom.
