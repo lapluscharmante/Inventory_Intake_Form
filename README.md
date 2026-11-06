@@ -156,6 +156,15 @@ separate them. In the print dialog pick the label printer and the
 sideways. Start at label # and the alignment settings apply only to the Avery
 sheet.
 
+**QR opens:** choose **Product page** (default) or **Store search by SKU**.
+The search link (`…/search?q=<SKU>`) is much shorter, so its QR code has
+fewer, bigger squares and scans far more reliably from small labels printed
+on a thermal printer; scanning it shows the store's search results for that
+SKU, one tap from the listing. Products without a SKU always link to their
+product page. On a thermal printer also turn the **darkness / density** down
+and the **speed** down: thermal printing spreads black into the QR code's
+white gaps, which is the usual reason a small code won't scan.
+
 Avery labels download as an exact Letter-size PDF. Open it and print with scale
 **100% / Actual size**, not "Fit to page", which shrinks the sheet so labels
 drift further off toward the bottom.
