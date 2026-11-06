@@ -142,8 +142,8 @@ how many labels each, then **↓ Labels PDF**.
 Each label has the title, price, variant (e.g. size) and SKU on the left end
 and a QR code on the right end that opens the product's page
 (`https://lapluscharmante.com/products/<handle>`; the store address can be
-changed in the tab). Draft and archived products are hidden unless **Active
-only** is unticked. **Start at label #** skips labels already used on a partly
+changed in the tab). Draft and archived products are hidden unless **Hide
+drafts & archived** is unticked; unlisted products are shown, with a badge. **Start at label #** skips labels already used on a partly
 used sheet.
 
 **Roll labels:** choose **Roll label 1" × 2.125" — 2 per label, cut in half**
@@ -160,8 +160,8 @@ sheet.
 The search link (`…/search?q=<SKU>`) is much shorter, so its QR code has
 fewer, bigger squares and scans far more reliably from small labels printed
 on a thermal printer; scanning it shows the store's search results for that
-SKU, one tap from the listing. Products without a SKU always link to their
-product page. On a thermal printer also turn the **darkness / density** down
+SKU, one tap from the listing. Products without a SKU, and unlisted products
+(which the store's search doesn't show), always link to their product page. On a thermal printer also turn the **darkness / density** down
 and the **speed** down: thermal printing spreads black into the QR code's
 white gaps, which is the usual reason a small code won't scan.
 
