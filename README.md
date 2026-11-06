@@ -146,7 +146,15 @@ changed in the tab). Draft and archived products are hidden unless **Active
 only** is unticked. **Start at label #** skips labels already used on a partly
 used sheet.
 
-Labels download as an exact Letter-size PDF. Open it and print with scale
+**Roll labels:** choose **Roll label 1" × 2.125"** under **Labels** to get a
+PDF with one 2.125" × 1" label per page instead, for label printers such as a
+DYMO LabelWriter (30336 labels) or a Rollo / Zebra / MUNBYN thermal printer.
+These have a larger QR code and room for a long variant on its own line. In
+the print dialog pick the label printer and the 1" × 2-1/8" (2.125 × 1 in)
+paper size at 100%; turn on landscape if it prints sideways. Start at label #
+and the alignment settings apply only to the Avery sheet.
+
+Avery labels download as an exact Letter-size PDF. Open it and print with scale
 **100% / Actual size**, not "Fit to page", which shrinks the sheet so labels
 drift further off toward the bottom.
 
