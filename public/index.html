@@ -361,7 +361,7 @@
 <div id="tab-shopify" style="display:none;">
 
 <section>
-  <h2>Shopify product tags <span style="font-size:11px; font-weight:normal; letter-spacing:0; text-transform:none; color:var(--text-subtle);">Avery Presta 94749 barbell labels — title, price &amp; SKU on one end, QR code to the product page on the other</span></h2>
+  <h2>Shopify product tags <span style="font-size:11px; font-weight:normal; letter-spacing:0; text-transform:none; color:var(--text-subtle);">title, price &amp; SKU on one side, QR code to the product page on the other</span></h2>
 
   <div class="row col-2">
     <div>
@@ -394,7 +394,14 @@
     <div class="print-bar">
       <span id="selected-count" style="font-size:13px; color:var(--text-muted);"></span>
       <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-        <label style="margin:0; display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--text-muted);" title="Skip labels already used on a partly used sheet">
+        <label style="margin:0; display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--text-muted);">
+          Labels
+          <select id="label-format" onchange="setLabelFormat(this.value)" style="width:auto; padding:4px 6px; font-size:13px;">
+            <option value="avery94749">Avery Presta 94749 sheet (½" × 2½")</option>
+            <option value="roll1x2125">Roll label 1" × 2.125" — 2 per label, cut in half</option>
+          </select>
+        </label>
+        <label class="sheet-only" style="margin:0; display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--text-muted);" title="Skip labels already used on a partly used sheet">
           Start at label #
           <input id="start-label" type="number" min="1" max="45" value="1" style="width:64px; padding:4px 6px; font-size:13px;" />
         </label>
@@ -403,7 +410,9 @@
     </div>
   </div>
 
-  <details style="margin-top:14px; font-size:13px; color:var(--text-muted);">
+  <p class="roll-only" style="display:none; margin-top:12px; font-size:12px; color:var(--text-subtle);">Roll labels download as a PDF with one 2.125" × 1" label per page, for label printers such as DYMO LabelWriter (30336) or Rollo / Zebra / MUNBYN thermal printers. Each label holds <strong>two</strong> ½"-tall tags, one above the other, laid out like the barbell labels — cut along the small marks at the middle to separate them. In the print dialog choose your label printer, paper size <strong>1" × 2-1/8"</strong> (DYMO 30336) or <strong>2.125 × 1 in</strong>, landscape if the label prints sideways, at <strong>100% / Actual size</strong>.</p>
+
+  <details class="sheet-only" style="margin-top:14px; font-size:13px; color:var(--text-muted);">
     <summary style="cursor:pointer;">Printer alignment</summary>
     <p style="margin:8px 0;">Labels download as a PDF laid out for <strong>Avery Presta 94749</strong> (45 per Letter sheet, 3 across × 15 down). Open the PDF and print it with scale set to <strong>100% / Actual size</strong> — not "Fit to page", which shrinks the sheet so labels drift further off toward the bottom.</p>
     <ol style="margin:0 0 10px 18px; padding:0;">
@@ -1731,6 +1740,28 @@ function labelTransform() {
   return { k: k, x: function(x) { return x * k + nx; }, y: function(y) { return y * k + ny; } };
 }
 
+var LABEL_FORMAT_KEY = 'jewelry_inventory_label_format';
+// 2.125" × 1" roll label holding two ½"-tall tags, stacked, to be cut apart;
+// each tag has the same 0.92" ends and text sizes as the Avery barbell labels
+var ROLL_1X2125 = { width: 2.125, height: 1, tagHeight: 0.5, padWidth: 0.92 };
+
+function labelFormat() {
+  return v('label-format') || 'avery94749';
+}
+
+function setLabelFormat(format) {
+  document.getElementById('label-format').value = format;
+  document.querySelectorAll('.sheet-only').forEach(function(el) { el.style.display = format === 'avery94749' ? '' : 'none'; });
+  document.querySelectorAll('.roll-only').forEach(function(el) { el.style.display = format === 'roll1x2125' ? '' : 'none'; });
+  try { localStorage.setItem(LABEL_FORMAT_KEY, format); } catch(e) {}
+}
+
+window.addEventListener('load', function() {
+  var saved = null;
+  try { saved = localStorage.getItem(LABEL_FORMAT_KEY); } catch(e) {}
+  setLabelFormat(saved === 'roll1x2125' ? 'roll1x2125' : 'avery94749');
+});
+
 async function printShopifyTags() {
   var chosen = shopifyProducts.filter(function(p) { return p.selected; });
   if (!chosen.length) return;
@@ -1741,7 +1772,8 @@ async function printShopifyTags() {
     var libs = await Promise.all([loadJsPDF(), loadQrLib()]);
     var jsPDF = libs[0], qrcode = libs[1];
     var base = storeBaseUrl();
-    var start = Math.max(1, Math.min(45, parseInt(v('start-label'), 10) || 1));
+    var roll = labelFormat() === 'roll1x2125';
+    var start = roll ? 1 : Math.max(1, Math.min(45, parseInt(v('start-label'), 10) || 1));
     var cells = [];
     for (var i = 1; i < start; i++) cells.push(null);
     chosen.forEach(function(p) {
@@ -1750,11 +1782,23 @@ async function printShopifyTags() {
       qr.make();
       for (var c = 0; c < p.copies; c++) cells.push({ product: p, qr: qr });
     });
-    var doc = new jsPDF({ orientation: 'portrait', unit: 'in', format: 'letter' });
-    drawAveryPages(doc, cells, function(doc, cell, x, y, t) { drawAveryLabel(doc, cell, x, y, t); }, false);
-    doc.save('shopify_labels_' + new Date().toISOString().slice(0,10) + '.pdf');
+    var doc;
+    if (roll) {
+      // Landscape 2.125" × 1" pages, two tags per page
+      doc = new jsPDF({ orientation: 'landscape', unit: 'in', format: [ROLL_1X2125.height, ROLL_1X2125.width] });
+      for (var t = 0; t < cells.length; t += 2) {
+        if (t > 0) doc.addPage([ROLL_1X2125.height, ROLL_1X2125.width], 'landscape');
+        drawRollLabel(doc, cells[t], cells[t + 1]);
+      }
+    } else {
+      doc = new jsPDF({ orientation: 'portrait', unit: 'in', format: 'letter' });
+      drawAveryPages(doc, cells, function(doc, cell, x, y, t) { drawAveryLabel(doc, cell, x, y, t); }, false);
+    }
+    doc.save((roll ? 'shopify_roll_labels_' : 'shopify_labels_') + new Date().toISOString().slice(0,10) + '.pdf');
     var labels = cells.filter(Boolean).length;
-    showSessionMsg('Downloaded ' + labels + ' label' + (labels !== 1 ? 's' : '') + ' — print at 100% / Actual size.');
+    showSessionMsg(roll
+      ? 'Downloaded ' + labels + ' tag' + (labels !== 1 ? 's' : '') + ' on ' + Math.ceil(labels / 2) + ' roll label' + (Math.ceil(labels / 2) !== 1 ? 's' : '') + ' — print at 100%.'
+      : 'Downloaded ' + labels + ' label' + (labels !== 1 ? 's' : '') + ' — print at 100% / Actual size.');
   } catch(e) {
     alert('Couldn\'t make the labels: ' + e.message);
   }
@@ -1820,52 +1864,84 @@ function drawBarbellOutline(doc, x, y, k) {
 
 // Title, price + variant and SKU on the left end; QR code on the right end
 function drawAveryLabel(doc, cell, x, y, t) {
-  var g = AVERY_94749, p = cell.product, k = t.k, inset = 0.05;
-  var textW = (g.padWidth - 2 * inset) * k;
-  var lh = function(pt) { return pt / 72 * 1.1 * k; };
+  drawBarbellTag(doc, cell, x, y, AVERY_94749.width, AVERY_94749.height, AVERY_94749.padWidth, t.k);
+}
 
+// One small tag: text on the left end, QR code on the right end (k scales everything)
+function drawBarbellTag(doc, cell, x, y, width, height, padWidth, k) {
+  var inset = 0.05;
+  drawLabelText(doc, cell.product, x + inset * k, y, (padWidth - 2 * inset) * k, height * k,
+    { title: 6.5 * k, titleLines: 2, price: 9 * k, small: 6.5 * k, sku: 6 * k });
+  drawQr(doc, cell.qr, x + (width - padWidth / 2) * k, y + height / 2 * k, 0.44 * k);
+}
+
+// Two tags on one 2.125" × 1" roll label (either may be missing), with short
+// cut marks at both edges of the halfway line
+function drawRollLabel(doc, top, bottom) {
+  var g = ROLL_1X2125;
+  if (top) drawBarbellTag(doc, top, 0, 0, g.width, g.tagHeight, g.padWidth, 1);
+  if (bottom) drawBarbellTag(doc, bottom, 0, g.tagHeight, g.width, g.tagHeight, g.padWidth, 1);
+  doc.setDrawColor(0);
+  doc.setLineWidth(0.01);
+  doc.line(0, g.tagHeight, 0.08, g.tagHeight);
+  doc.line(g.width - 0.08, g.tagHeight, g.width, g.tagHeight);
+  doc.line(g.padWidth + 0.03, g.tagHeight, g.width - g.padWidth - 0.03, g.tagHeight);
+}
+
+// Title (clamped to a few lines), price with the variant beside it, and SKU,
+// centred vertically in a box of the given height; sizes are in points
+function drawLabelText(doc, p, left, top, textW, height, sizes) {
+  var lh = function(pt) { return pt / 72 * 1.1; };
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(6.5 * k);
-  var titleLines = clampLines(doc, doc.splitTextToSize(p.title, textW), 2, textW);
+  doc.setFontSize(sizes.title);
+  var titleLines = clampLines(doc, doc.splitTextToSize(p.title, textW), sizes.titleLines, textW);
   var hasPriceLine = p.price || p.variant;
-  var blockH = titleLines.length * lh(6.5) + (hasPriceLine ? lh(9) : 0) + (p.sku ? lh(6) : 0);
-  var cy = y + (g.height * k - blockH) / 2;
-  var left = x + inset * k;
+  var priceText = p.price ? '$' + formatPrice(p.price) : '';
+  doc.setFontSize(sizes.price);
+  var priceW = priceText ? doc.getTextWidth(priceText) : 0;
+  doc.setFontSize(sizes.small);
+  var blockH = titleLines.length * lh(sizes.title) + (hasPriceLine ? lh(sizes.price) : 0) + (p.sku ? lh(sizes.sku) : 0);
+  // A variant too long to sit beside the price gets its own line when the label has room for one
+  var variantOwnLine = p.price && p.variant && doc.getTextWidth(' · ' + p.variant) > textW - priceW
+    && blockH + lh(sizes.small) <= height - 0.04;
+  if (variantOwnLine) blockH += lh(sizes.small);
+  var cy = top + (height - blockH) / 2;
 
-  cy += lh(6.5) * 0.8;
+  cy += lh(sizes.title) * 0.8;
   doc.text(titleLines, left, cy, { lineHeightFactor: 1.1 });
-  cy += (titleLines.length - 1) * lh(6.5);
+  cy += (titleLines.length - 1) * lh(sizes.title);
 
   if (hasPriceLine) {
-    cy += lh(9) * 0.95;
+    cy += lh(sizes.price) * 0.95;
     var cx = left;
     if (p.price) {
-      doc.setFontSize(9 * k);
-      var priceText = '$' + formatPrice(p.price);
+      doc.setFontSize(sizes.price);
       doc.text(priceText, cx, cy);
-      cx += doc.getTextWidth(priceText);
+      cx += priceW;
     }
     if (p.variant) {
-      doc.setFontSize(6.5 * k);
-      var variantText = (p.price ? ' · ' : '') + p.variant;
+      doc.setFontSize(sizes.small);
+      var variantText = (p.price && !variantOwnLine ? ' · ' : '') + p.variant;
+      if (variantOwnLine) { cy += lh(sizes.small); cx = left; }
       var room = left + textW - cx;
       while (variantText.length > 1 && doc.getTextWidth(variantText) > room) variantText = variantText.slice(0, -2) + '…';
       doc.text(variantText, cx, cy);
     }
   }
   if (p.sku) {
-    cy += lh(6) * 1.0;
+    cy += lh(sizes.sku);
     doc.setFont('courier', 'bold');
-    doc.setFontSize(6 * k);
+    doc.setFontSize(sizes.sku);
     var sku = p.sku;
     while (sku.length > 1 && doc.getTextWidth(sku) > textW) sku = sku.slice(0, -2) + '…';
     doc.text(sku, left, cy);
   }
+}
 
-  // QR code: dark modules as filled runs, with a 2-module quiet zone, centred on the right end
-  var qr = cell.qr, n = qr.getModuleCount(), size = 0.44 * k, cellSize = size / (n + 4);
-  var qx = x + (g.width - g.padWidth / 2) * k - size / 2 + 2 * cellSize;
-  var qy = y + g.height / 2 * k - size / 2 + 2 * cellSize;
+// QR code centred on (cx, cy): dark modules as filled runs, with a 2-module quiet zone
+function drawQr(doc, qr, cx, cy, size) {
+  var n = qr.getModuleCount(), cellSize = size / (n + 4);
+  var qx = cx - size / 2 + 2 * cellSize, qy = cy - size / 2 + 2 * cellSize;
   doc.setFillColor(0);
   for (var r = 0; r < n; r++) {
     for (var c = 0; c < n; c++) {
