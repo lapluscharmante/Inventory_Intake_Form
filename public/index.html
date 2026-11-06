@@ -398,7 +398,7 @@
           Labels
           <select id="label-format" onchange="setLabelFormat(this.value)" style="width:auto; padding:4px 6px; font-size:13px;">
             <option value="avery94749">Avery Presta 94749 sheet (½" × 2½")</option>
-            <option value="roll1x2125">Roll label 1" × 2.125"</option>
+            <option value="roll1x2125">Roll label 1" × 2.125" — 2 per label, cut in half</option>
           </select>
         </label>
         <label class="sheet-only" style="margin:0; display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--text-muted);" title="Skip labels already used on a partly used sheet">
@@ -410,7 +410,7 @@
     </div>
   </div>
 
-  <p class="roll-only" style="display:none; margin-top:12px; font-size:12px; color:var(--text-subtle);">Roll labels download as a PDF with one 2.125" × 1" label per page, for label printers such as DYMO LabelWriter (30336) or Rollo / Zebra / MUNBYN thermal printers. In the print dialog choose your label printer, paper size <strong>1" × 2-1/8"</strong> (DYMO 30336) or <strong>2.125 × 1 in</strong>, landscape if the label prints sideways, at <strong>100% / Actual size</strong>.</p>
+  <p class="roll-only" style="display:none; margin-top:12px; font-size:12px; color:var(--text-subtle);">Roll labels download as a PDF with one 2.125" × 1" label per page, for label printers such as DYMO LabelWriter (30336) or Rollo / Zebra / MUNBYN thermal printers. Each label holds <strong>two</strong> ½"-tall tags, one above the other, laid out like the barbell labels — cut along the small marks at the middle to separate them. In the print dialog choose your label printer, paper size <strong>1" × 2-1/8"</strong> (DYMO 30336) or <strong>2.125 × 1 in</strong>, landscape if the label prints sideways, at <strong>100% / Actual size</strong>.</p>
 
   <details class="sheet-only" style="margin-top:14px; font-size:13px; color:var(--text-muted);">
     <summary style="cursor:pointer;">Printer alignment</summary>
@@ -1741,7 +1741,9 @@ function labelTransform() {
 }
 
 var LABEL_FORMAT_KEY = 'jewelry_inventory_label_format';
-var ROLL_1X2125 = { width: 2.125, height: 1 };
+// 2.125" × 1" roll label holding two ½"-tall tags, stacked, to be cut apart;
+// each tag has the same 0.92" ends and text sizes as the Avery barbell labels
+var ROLL_1X2125 = { width: 2.125, height: 1, tagHeight: 0.5, padWidth: 0.92 };
 
 function labelFormat() {
   return v('label-format') || 'avery94749';
@@ -1782,19 +1784,21 @@ async function printShopifyTags() {
     });
     var doc;
     if (roll) {
-      // One label per page, landscape 2.125" × 1"
+      // Landscape 2.125" × 1" pages, two tags per page
       doc = new jsPDF({ orientation: 'landscape', unit: 'in', format: [ROLL_1X2125.height, ROLL_1X2125.width] });
-      cells.forEach(function(cell, i) {
-        if (i > 0) doc.addPage([ROLL_1X2125.height, ROLL_1X2125.width], 'landscape');
-        drawRollLabel(doc, cell);
-      });
+      for (var t = 0; t < cells.length; t += 2) {
+        if (t > 0) doc.addPage([ROLL_1X2125.height, ROLL_1X2125.width], 'landscape');
+        drawRollLabel(doc, cells[t], cells[t + 1]);
+      }
     } else {
       doc = new jsPDF({ orientation: 'portrait', unit: 'in', format: 'letter' });
       drawAveryPages(doc, cells, function(doc, cell, x, y, t) { drawAveryLabel(doc, cell, x, y, t); }, false);
     }
     doc.save((roll ? 'shopify_roll_labels_' : 'shopify_labels_') + new Date().toISOString().slice(0,10) + '.pdf');
     var labels = cells.filter(Boolean).length;
-    showSessionMsg('Downloaded ' + labels + ' label' + (labels !== 1 ? 's' : '') + ' — print at 100% / Actual size.');
+    showSessionMsg(roll
+      ? 'Downloaded ' + labels + ' tag' + (labels !== 1 ? 's' : '') + ' on ' + Math.ceil(labels / 2) + ' roll label' + (Math.ceil(labels / 2) !== 1 ? 's' : '') + ' — print at 100%.'
+      : 'Downloaded ' + labels + ' label' + (labels !== 1 ? 's' : '') + ' — print at 100% / Actual size.');
   } catch(e) {
     alert('Couldn\'t make the labels: ' + e.message);
   }
@@ -1860,18 +1864,28 @@ function drawBarbellOutline(doc, x, y, k) {
 
 // Title, price + variant and SKU on the left end; QR code on the right end
 function drawAveryLabel(doc, cell, x, y, t) {
-  var g = AVERY_94749, k = t.k, inset = 0.05;
-  drawLabelText(doc, cell.product, x + inset * k, y, (g.padWidth - 2 * inset) * k, g.height * k,
-    { title: 6.5 * k, titleLines: 2, price: 9 * k, small: 6.5 * k, sku: 6 * k });
-  drawQr(doc, cell.qr, x + (g.width - g.padWidth / 2) * k, y + g.height / 2 * k, 0.44 * k);
+  drawBarbellTag(doc, cell, x, y, AVERY_94749.width, AVERY_94749.height, AVERY_94749.padWidth, t.k);
 }
 
-// 2.125" × 1" roll label: text on the left, a larger QR code on the right
-function drawRollLabel(doc, cell) {
-  var g = ROLL_1X2125, margin = 0.08, qrSize = 0.86;
-  drawLabelText(doc, cell.product, margin, 0, g.width - qrSize - 3 * margin, g.height,
-    { title: 8, titleLines: 3, price: 12, small: 8, sku: 7.5 });
-  drawQr(doc, cell.qr, g.width - margin - qrSize / 2, g.height / 2, qrSize);
+// One small tag: text on the left end, QR code on the right end (k scales everything)
+function drawBarbellTag(doc, cell, x, y, width, height, padWidth, k) {
+  var inset = 0.05;
+  drawLabelText(doc, cell.product, x + inset * k, y, (padWidth - 2 * inset) * k, height * k,
+    { title: 6.5 * k, titleLines: 2, price: 9 * k, small: 6.5 * k, sku: 6 * k });
+  drawQr(doc, cell.qr, x + (width - padWidth / 2) * k, y + height / 2 * k, 0.44 * k);
+}
+
+// Two tags on one 2.125" × 1" roll label (either may be missing), with short
+// cut marks at both edges of the halfway line
+function drawRollLabel(doc, top, bottom) {
+  var g = ROLL_1X2125;
+  if (top) drawBarbellTag(doc, top, 0, 0, g.width, g.tagHeight, g.padWidth, 1);
+  if (bottom) drawBarbellTag(doc, bottom, 0, g.tagHeight, g.width, g.tagHeight, g.padWidth, 1);
+  doc.setDrawColor(0);
+  doc.setLineWidth(0.01);
+  doc.line(0, g.tagHeight, 0.08, g.tagHeight);
+  doc.line(g.width - 0.08, g.tagHeight, g.width, g.tagHeight);
+  doc.line(g.padWidth + 0.03, g.tagHeight, g.width - g.padWidth - 0.03, g.tagHeight);
 }
 
 // Title (clamped to a few lines), price with the variant beside it, and SKU,
